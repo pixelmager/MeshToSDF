@@ -13,8 +13,8 @@
 #include <Windows.h>
 
 #include <intrin.h>
-//#include <immintrin.h>
-#include <zmmintrin.h>
+#include <immintrin.h>
+//#include <zmmintrin.h>
 
 #include <profiler.h>
 

@@ -50,10 +50,26 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 
 	const __m256 D_MAX = _mm256_set1_ps( FLT_MAX );
 
-	__m256i ofs;
+	//__m256i ii;
+	//for ( int i=0,n=SIMD_SIZ; i<n; ++i )
+	//	ii.m256i_i32[i] = parms->minidx + i;
+
+	const __m256 fdx = _mm256_set1_ps( (float32_t)dim_x);
+	const __m256 fdy = _mm256_set1_ps( (float32_t)dim_y);
+	const __m256 fdz = _mm256_set1_ps( (float32_t)dim_z);
+	const __m256 fdxy = _mm256_mul_ps(fdx, fdy);
+	const __m256 rcp_fdx = _mm256_rcp_ps(fdx);
+	const __m256 rcp_fdxy = _mm256_rcp_ps(fdxy);
+	
+	const __m256 rcp_fdx_half = _mm256_mul_ps( rcp_fdx, _mm256_set1_ps(0.5f) ); //TODO: HACK
+	const __m256 rcp_fdxy_half = _mm256_mul_ps( rcp_fdxy, _mm256_set1_ps(0.5f) );  //TODO: HACK
+	
+	__m256 fi;
 	for ( int i=0,n=SIMD_SIZ; i<n; ++i )
-		ofs.m256i_i32[i] = parms->minidx + i;
-	__m256i ii = ofs;
+		fi.m256_f32[i] = (float32_t)(parms->minidx + i);
+
+	int _mm_rounding = _MM_GET_ROUNDING_MODE();
+	_MM_SET_ROUNDING_MODE(_MM_ROUND_DOWN);
 
 	assert( parms->minidx % SIMD_SIZ == 0 );
 	assert( parms->count % SIMD_SIZ == 0 );
@@ -61,23 +77,54 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 	const int32_t block_count = parms->count / SIMD_SIZ;
 	for ( int32_t idx_block=block_startidx, nidx_block=block_startidx+block_count; idx_block<nidx_block; ++idx_block )
 	{
-		__m256 idx_x;
-		__m256 idx_y;
-		__m256 idx_z;
+		__m256 idx_x, idx_y, idx_z;
 
+		//__m256 idx0_x, idx0_y, idx0_z;
+		//TODO: if dim_* are 2^n, the grid-indices calculation is just bit-mask+offset
 		//TODO: vectorize
-		for ( int i=0,n=SIMD_SIZ; i<n; ++i )
+		//for ( int i=0,n=SIMD_SIZ; i<n; ++i )
+		//{
+		//	//int ii = SIMD_SIZ*idx_block + i;
+		//	int32_t ix =  ii.m256i_i32[i] % (dim_x);
+		//	int32_t iy = (ii.m256i_i32[i] / dim_x) % dim_y;
+		//	int32_t iz =  ii.m256i_i32[i] / (dim_x*dim_y);
+		//
+		//	idx_x.m256_f32[i] = (float32_t)ix;
+		//	idx_y.m256_f32[i] = (float32_t)iy;
+		//	idx_z.m256_f32[i] = (float32_t)iz;
+		//}
+
 		{
-			//int ii = SIMD_SIZ*idx_block + i;
-			int32_t ix =  ii.m256i_i32[i] % (dim_x);
-			int32_t iy = (ii.m256i_i32[i] / dim_x) % dim_y;
-			int32_t iz =  ii.m256i_i32[i] / (dim_x*dim_y);
+			//note: example
+			//2x2x2=8
+			//idx=5 => (x,y,z)=(0,1,1)
+			//iz = idx/(x*y)           = floor( 5/(2*2) ) = 1
+			//iy = (idx - iz*x*y)/x    = floor( (5-1*2*2)/2 )  = floor( (5-4)/2 ) = 0
+			//ix = idx - iy*x - iz*x*y = floor( 5 - 0*2 - 1*2*2 ) = 5-4 = 1
+			
+			//iz = idx/(x*y)
+			idx_z = _mm256_fmadd_ps( fi, rcp_fdxy, rcp_fdxy_half ); //TODO: HACK, float-precision
+			idx_z = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_z)); //note: floor
 		
-			idx_x.m256_f32[i] = (float32_t)ix;
-			idx_y.m256_f32[i] = (float32_t)iy;
-			idx_z.m256_f32[i] = (float32_t)iz;
+			//iy = (idx - iz*x*y)/x
+			__m256 izxy = _mm256_mul_ps(idx_z, fdxy);
+			idx_y = _mm256_sub_ps(fi, izxy);
+			idx_y = _mm256_fmadd_ps( idx_y, rcp_fdx, rcp_fdx_half ); //TODO: HACK, float-precision
+			idx_y = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_y)); //note: floor
+		
+			//ix = idx - iy*y - iz*x*y
+			__m256 izxy_iyx = _mm256_fmadd_ps(idx_y, fdx, izxy);
+			idx_x = _mm256_sub_ps( fi, izxy_iyx );
+			//idx_x = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_x)); //note: floor
 		}
-		//__m256 ii = _mm256_fmadd_ps( 
+
+		//note: debug-check
+		//for ( int i=0,n=SIMD_SIZ; i<n; ++i )
+		//{
+		//	assert( idx0_x.m256_f32[i] == idx_x.m256_f32[i] );
+		//	assert( idx0_y.m256_f32[i] == idx_y.m256_f32[i] );
+		//	assert( idx0_z.m256_f32[i] == idx_z.m256_f32[i] );
+		//}
 
 		const __m256 p_x = _mm256_fmadd_ps( stepsiz_x, idx_x, p0_x );
 		const __m256 p_y = _mm256_fmadd_ps( stepsiz_y, idx_y, p0_y );
@@ -97,8 +144,11 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 		_mm256_store_ps( out_data, d_min );
 		out_data += SIMD_SIZ;
 
-		ii = _mm256_add_epi32( ii, _mm256_set1_epi32(SIMD_SIZ) );
+		//ii = _mm256_add_epi32( ii, _mm256_set1_epi32(SIMD_SIZ) );
+		fi = _mm256_add_ps( fi, _mm256_set1_ps(SIMD_SIZ) );
 	}
+
+	_MM_SET_ROUNDING_MODE(_mm_rounding);
 }
 
 // ====
