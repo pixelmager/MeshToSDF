@@ -6,9 +6,6 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mesh_to_sdf", "mesh_to_sdf\mesh_to_sdf.vcxproj", "{45CD8D3A-84F5-4902-A354-D8436A84E640}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{4D5A3546-F1AA-46CB-9A85-E5A11E344A9E}"
-	ProjectSection(SolutionItems) = preProject
-		..\src\signed_distance.cpp = ..\src\signed_distance.cpp
-	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

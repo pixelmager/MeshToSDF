@@ -198,6 +198,7 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	{
 		// per thread
 		{
+            assert( idx_thread < num_hwthreads );
 			parms[idx_thread].minidx = idx_thread * num_cells_per_thread;
 			parms[idx_thread].count  = min( num_cells_per_thread, num_cells_evaluated - parms[idx_thread].minidx );
 			assert( parms[idx_thread].count % SIMD_SIZ == 0 );

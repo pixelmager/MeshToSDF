@@ -20,6 +20,7 @@
 #include <evaluators/eval_tris16.h>
 
 #include <evaluators/eval_precalc_threaded.h>
+#include <evaluators/eval_grid4_threaded.h>
 #include <evaluators/eval_grid8_threaded.h>
 #include <evaluators/eval_grid16_threaded.h>
 
@@ -76,19 +77,23 @@ void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_
 //      https://github.com/janba/GEL/blob/master/src/demo/MeshDistance/meshdist.cpp
 int main()
 {
-	printf( "%d sse\n", InstructionSet::SSE());
-	printf( "%d sse2\n", InstructionSet::SSE2());
-	printf( "%d sse3\n", InstructionSet::SSE3());
-	printf( "%d sse41\n", InstructionSet::SSE41());
-	printf( "%d sse42\n", InstructionSet::SSE42());
-	printf( "%d sse4a\n", InstructionSet::SSE4a());
-	printf( "%d fma\n", InstructionSet::FMA());
-	printf( "%d avx\n", InstructionSet::AVX());
-    printf( "%d avx2\n", InstructionSet::AVX2());
-    printf( "%d avx512cd\n", InstructionSet::AVX512CD());
-    printf( "%d avx512er\n", InstructionSet::AVX512ER());
-    printf( "%d avx512f\n", InstructionSet::AVX512F());
-    printf( "%d avx512pf\n", InstructionSet::AVX512PF());
+	printf( "sse=%d\n", InstructionSet::SSE());
+	printf( "sse2=%d\n", InstructionSet::SSE2());
+	printf( "sse3=%d\n", InstructionSet::SSE3());
+	printf( "sse41=%d\n", InstructionSet::SSE41());
+	printf( "sse42=%d\n", InstructionSet::SSE42());
+	printf( "sse4a=%d\n", InstructionSet::SSE4a());
+	printf( "fma=%d\n", InstructionSet::FMA());
+	printf( "avx=%d\n", InstructionSet::AVX());
+    printf( "avx2=%d\n", InstructionSet::AVX2());
+    printf( "avx512cd=%d\n", InstructionSet::AVX512CD());
+    printf( "avx512er=%d\n", InstructionSet::AVX512ER());
+    printf( "avx512f=%d\n", InstructionSet::AVX512F());
+    printf( "avx512pf=%d\n", InstructionSet::AVX512PF());
+
+    //bool support_avx = InstructionSet::AVX();
+    bool support_avx256 = InstructionSet::AVX2();
+    bool support_avx512 = InstructionSet::AVX512CD() && InstructionSet::AVX512F();
 
 	//system("pause");
 
@@ -106,8 +111,8 @@ int main()
 	//
 	//enum { GRID_SIZ_X = 16, GRID_SIZ_Y = 16, GRID_SIZ_Z = 16 };
 	//enum { GRID_SIZ_X = 32, GRID_SIZ_Y = 32, GRID_SIZ_Z = 32 };
-	//enum { GRID_SIZ_X = 64, GRID_SIZ_Y = 64, GRID_SIZ_Z = 64 };
-	enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
+	enum { GRID_SIZ_X = 64, GRID_SIZ_Y = 64, GRID_SIZ_Z = 64 };
+	//enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
 
 	//note: assimp import to trimesh
 	PROFILE_ENTER("loadmodel");
@@ -146,6 +151,7 @@ int main()
 	uint64_t t_max = 0;
 	for ( int i=0,n=NUM_ITER; i<n; ++i )
 	#endif //DO_MULTIPLE_TIMINGS
+
 	{
 		PROFILE_SCOPE("sdf_calc");
 
@@ -160,26 +166,56 @@ int main()
 		//eval_sdf__precalc_simd_8grid( sdf, mesh );
 		//eval_sdf__precalc_simd_16grid( sdf, mesh );
 
-		//eval_sdf__precalc_threaded( sdf, mesh );
-		//eval_sdf__aos_threaded( sdf, mesh );
-		//eval_sdf__grid4_threaded( sdf, mesh );
-		eval_sdf__grid8_threaded( sdf, mesh );
-		//eval_sdf__grid16_threaded( sdf, mesh );
+        if (support_avx512)
+        {
+            const uint64_t t0 = gettime_ms();
+            eval_sdf__grid16_threaded( sdf, mesh );
+            const uint64_t t1 = gettime_ms();
+            printf( "%dms\n", (int)(t1-t0) );
+        }
+        else
+            printf("avx512 not supported\n");
 
-		//eval_sdf__simd_soa_4tris( sdf, mesh );
-		//eval_sdf__simd_soa_8tris( sdf, mesh );
-		//eval_sdf__simd_soa_16tris( sdf, mesh );
-
-		const uint64_t t1_ms = gettime_ms();
-
-		#if defined ( DO_MULTIPLE_TIMINGS )
-		timings[i] = t1_ms - t0_ms;
-		t_min = std::min( t_min, timings[i] );
-		t_max = std::max( t_max, timings[i] );
-		//printf( "timing %d: sdf %dms\n", i, (int)timings[i] );
-		#else
-		printf( "timing: sdf %dms\n", (int)(t1_ms-t0_ms) );
-		#endif //DO_MULTIPLE_TIMINGS
+        //if ( support_avx256 )
+        //{
+        //    const uint64_t t0 = gettime_ms();
+        //    eval_sdf__grid8_threaded(sdf, mesh);
+        //    const uint64_t t1 = gettime_ms();
+        //    printf( "%dms\n", (int)(t1-t0) );
+        //}
+        //else
+        //    printf("avx256 not supported\n");
+		//
+        //{
+        //    const uint64_t t0 = gettime_ms();
+        //    eval_sdf__grid4_threaded(sdf, mesh);
+        //    const uint64_t t1 = gettime_ms();
+        //    printf( "%dms\n", (int)(t1-t0) );
+        //}
+		//
+        //{
+        //    const uint64_t t0 = gettime_ms();
+        //    eval_sdf__precalc_threaded(sdf, mesh);
+        //    const uint64_t t1 = gettime_ms();
+        //    printf( "%dms\n", (int)(t1-t0) );
+        //}
+		//
+        ////eval_sdf__aos_threaded( sdf, mesh );
+		//
+		////eval_sdf__simd_soa_4tris( sdf, mesh );
+		////eval_sdf__simd_soa_8tris( sdf, mesh );
+		////eval_sdf__simd_soa_16tris( sdf, mesh );
+		//
+		//const uint64_t t1_ms = gettime_ms();
+		//
+		//#if defined ( DO_MULTIPLE_TIMINGS )
+		//timings[i] = t1_ms - t0_ms;
+		//t_min = std::min( t_min, timings[i] );
+		//t_max = std::max( t_max, timings[i] );
+		////printf( "timing %d: sdf %dms\n", i, (int)timings[i] );
+		//#else
+		//printf( "timing: sdf %dms\n", (int)(t1_ms-t0_ms) );
+		//#endif //DO_MULTIPLE_TIMINGS
 	}
 	
 	#if defined ( DO_MULTIPLE_TIMINGS )
@@ -188,7 +224,7 @@ int main()
 	printf( "\n(min, med, max) = (%dms, %dms, %dms)\n\n", (int)t_min, (int)t_med, (int)t_max );
 	#endif //DO_MULTIPLE_TIMINGS
 
-	#define DO_SANITY_CHECK
+	//#define DO_SANITY_CHECK
 	#ifdef DO_SANITY_CHECK
 	{
 		PROFILE_SCOPE("sanity_check");

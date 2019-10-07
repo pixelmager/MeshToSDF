@@ -2,8 +2,10 @@
 
 #define PROFILER_NONE 0
 #define PROFILER_MICROPROFILE 1
+#define PROFILER_SUPERLUMINAL 2
 
 //#define USE_PROFILER PROFILER_MICROPROFILE
+//#define USE_PROFILER PROFILER_SUPERLUMINAL
 #define USE_PROFILER PROFILER_NONE
 
 //TODO: if (USE_PROFILER == PROFILER_MICROPROFILE)
@@ -61,7 +63,24 @@ void deinit_profiler()
 //MICROPROFILE_DECLARE_LOCAL_COUNTER(LocalCounter);
 //MICROPROFILE_DEFINE_LOCAL_COUNTER(LocalCounter, "/runtime/localcounter");
 
+#elif ( USE_PROFILER == PROFILER_SUPERLUMINAL )
+
+#pragma comment( lib, "PerformanceAPI_MD" )
+
+#include <Superluminal/PerformanceAPI.h>
+
+#define PERFORMANCEAPI_ENABLED 1
+
+void init_profiler() {}
+void deinit_profiler() {}
+#define PROFILE_FUNC() PERFORMANCEAPI_INSTRUMENT_FUNCTION()
+#define PROFILE_ENTER(M) PerformanceAPI::BeginEvent(M)
+#define PROFILE_LEAVE(M) PerformanceAPI::EndEvent()
+#define PROFILE_SCOPE(M) PERFORMANCEAPI_INSTRUMENT(M)
+#define PROFILE_THREADNAME(M) PerformanceAPI::SetCurrentThreadName(M)
+
 #else
+
 void init_profiler() {}
 void deinit_profiler() {}
 #define PROFILE_FUNC()
@@ -69,4 +88,6 @@ void deinit_profiler() {}
 #define PROFILE_LEAVE(M)
 #define PROFILE_SCOPE(M)
 #define PROFILE_THREADNAME(M)
+//SetThreadDescription( GetCurrentProcess(), (M) );
+
 #endif

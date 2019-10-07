@@ -3,23 +3,23 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 
-public struct header_t
-{
-    public System.Int32 dim_x, dim_y, dim_z;
-    public System.Single bb_mn_x, bb_mn_y, bb_mn_z;
-    public System.Single bb_mx_x, bb_mx_y, bb_mx_z;
-};
-public struct sdf_t
-{
-    public header_t header;
-    public System.Single[] data;
-};
-
 public class sdf_loader
 {
     public static Material mat;
 
-    [UnityEditor.MenuItem("Custom/Load SDF from Asset")]
+    struct header_t
+    {
+        public System.Int32 dim_x, dim_y, dim_z;
+        public System.Single bb_mn_x, bb_mn_y, bb_mn_z;
+        public System.Single bb_mx_x, bb_mx_y, bb_mx_z;
+    };
+    struct sdf_t
+    {
+        public header_t header;
+        public System.Single[] data;
+    };
+
+    [UnityEditor.MenuItem("Custom/Convert SDF")]
     public static void Convert_SDF()
     {
         string fn = "Assets/tex3D_raw/sdf.bin";
@@ -92,7 +92,7 @@ public class sdf_loader
             colors[i] = new Color( d, d, d, d );
         }
 
-        Texture3D densitymap_a8 = new Texture3D(sdf.header.dim_x, sdf.header.dim_y, sdf.header.dim_z, TextureFormat.Alpha8, mipChain:false);
+        Texture3D densitymap_a8 = new Texture3D(sdf.header.dim_x, sdf.header.dim_y, sdf.header.dim_z, TextureFormat.Alpha8, mipmap: false);
         densitymap_a8.wrapMode = TextureWrapMode.Clamp;
         densitymap_a8.filterMode = FilterMode.Point;
         densitymap_a8.mipMapBias = 0;
@@ -107,7 +107,7 @@ public class sdf_loader
         Material mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/materials/mat_vis3dtex.mat");
         if ( mat != null )
         {
-            mat.SetTexture( "_VolumeTex", densitymap_a8 );
+            mat.SetTexture("_MainTex", densitymap_a8 );
         }
     }
 }
