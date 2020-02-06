@@ -24,6 +24,7 @@
 #include <evaluators/eval_grid8_threaded.h>
 #include <evaluators/eval_grid16_threaded.h>
 
+
 ///////////////////////////////////////////////////////////////////////////////
 
 //note: random SIMD references
@@ -73,27 +74,43 @@ void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_
 	#endif //NDEBUG
 }
 
+void print_support( bool print_matching )
+{
+	#define LPT_FNC(M) InstructionSet::M()
+	#define LPT_DOPRINT(M) if(print_matching == LPT_FNC(M) ) printf( #M ## " " )
+	LPT_DOPRINT( SSE );
+	LPT_DOPRINT( SSE2 );
+	LPT_DOPRINT( SSE3 );
+	LPT_DOPRINT( SSE41 );
+	LPT_DOPRINT( SSE42 );
+	LPT_DOPRINT( SSE4a );
+	LPT_DOPRINT( SSSE3 );
+
+	LPT_DOPRINT( AVX );
+	LPT_DOPRINT( AVX2 );
+	LPT_DOPRINT( AVX512CD );
+	LPT_DOPRINT( AVX512ER );
+	LPT_DOPRINT( AVX512F );
+	LPT_DOPRINT( AVX512PF );
+
+	LPT_DOPRINT( FMA );
+	#undef LPT_FNC
+	#undef LPT_DOPRINT
+}
+
 //TODO: precalc angle-weighted normals
 //      https://github.com/janba/GEL/blob/master/src/demo/MeshDistance/meshdist.cpp
 int main()
 {
-	printf( "sse=%d\n", InstructionSet::SSE());
-	printf( "sse2=%d\n", InstructionSet::SSE2());
-	printf( "sse3=%d\n", InstructionSet::SSE3());
-	printf( "sse41=%d\n", InstructionSet::SSE41());
-	printf( "sse42=%d\n", InstructionSet::SSE42());
-	printf( "sse4a=%d\n", InstructionSet::SSE4a());
-	printf( "fma=%d\n", InstructionSet::FMA());
-	printf( "avx=%d\n", InstructionSet::AVX());
-    printf( "avx2=%d\n", InstructionSet::AVX2());
-    printf( "avx512cd=%d\n", InstructionSet::AVX512CD());
-    printf( "avx512er=%d\n", InstructionSet::AVX512ER());
-    printf( "avx512f=%d\n", InstructionSet::AVX512F());
-    printf( "avx512pf=%d\n", InstructionSet::AVX512PF());
+	printf( "supported extensions: ");
+	print_support( true );
+	
+	printf( "\n(unsupported extensions: ");
+	print_support( false );
+	printf( "\n");
 
-    //bool support_avx = InstructionSet::AVX();
-    bool support_avx256 = InstructionSet::AVX2();
-    bool support_avx512 = InstructionSet::AVX512CD() && InstructionSet::AVX512F();
+	bool path_avx256 = InstructionSet::AVX2();
+	bool path_avx512 = InstructionSet::AVX512F();
 
 	//system("pause");
 
@@ -116,10 +133,10 @@ int main()
 
 	//note: assimp import to trimesh
 	PROFILE_ENTER("loadmodel");
-	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/sphere.obj" );
+	indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/sphere.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/pyramid_blob.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/tetra_nonormals.obj" );
-	indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/bunny.obj" );
+	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/bunny.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/tigre_sumatra_sketchfab.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/DeformedPigs.fbx" );
 	PROFILE_LEAVE("loadmodel");
@@ -166,23 +183,21 @@ int main()
 		//eval_sdf__precalc_simd_8grid( sdf, mesh );
 		//eval_sdf__precalc_simd_16grid( sdf, mesh );
 
-        if (support_avx512)
+        if ( path_avx512 )
         {
             const uint64_t t0 = gettime_ms();
             eval_sdf__grid16_threaded( sdf, mesh );
             const uint64_t t1 = gettime_ms();
             printf( "%dms\n", (int)(t1-t0) );
         }
-        else
-            printf("avx512 not supported\n");
 
-        //if ( support_avx256 )
-        //{
-        //    const uint64_t t0 = gettime_ms();
-        //    eval_sdf__grid8_threaded(sdf, mesh);
-        //    const uint64_t t1 = gettime_ms();
-        //    printf( "%dms\n", (int)(t1-t0) );
-        //}
+        if ( path_avx256 )
+        {
+            const uint64_t t0 = gettime_ms();
+            eval_sdf__grid8_threaded(sdf, mesh);
+            const uint64_t t1 = gettime_ms();
+            printf( "%dms\n", (int)(t1-t0) );
+        }
         //else
         //    printf("avx256 not supported\n");
 		//

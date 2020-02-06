@@ -24,6 +24,8 @@ struct workload_grid8_parms_t
 // ====
 void workload_grid8( workload_grid8_parms_t const * const parms )
 {
+	//#define VECTORIZE_GRIDCALC
+
 	enum { SIMD_SIZ=8, SIMD_ALIGN=4*SIMD_SIZ };
 
 	#ifndef NDEBUG
@@ -50,9 +52,11 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 
 	const __m256 D_MAX = _mm256_set1_ps( FLT_MAX );
 
-	//__m256i ii;
-	//for ( int i=0,n=SIMD_SIZ; i<n; ++i )
-	//	ii.m256i_i32[i] = parms->minidx + i;
+	#if !defined(VECTORIZE_GRIDCALC)
+	__m256i ii;
+	for ( int i=0,n=SIMD_SIZ; i<n; ++i )
+		ii.m256i_i32[i] = parms->minidx + i;
+	#endif
 
 	const __m256 fdx = _mm256_set1_ps( (float32_t)dim_x);
 	const __m256 fdy = _mm256_set1_ps( (float32_t)dim_y);
@@ -64,12 +68,17 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 	const __m256 rcp_fdx_half = _mm256_mul_ps( rcp_fdx, _mm256_set1_ps(0.5f) ); //TODO: HACK
 	const __m256 rcp_fdxy_half = _mm256_mul_ps( rcp_fdxy, _mm256_set1_ps(0.5f) );  //TODO: HACK
 	
+	#if defined(VECTORIZE_GRIDCALC)
 	__m256 fi;
 	for ( int i=0,n=SIMD_SIZ; i<n; ++i )
 		fi.m256_f32[i] = (float32_t)(parms->minidx + i);
+	#endif
 
+	#if defined(VECTORIZE_GRIDCALC)
+	//TODO: replace with rounding funct-parms instead
 	int _mm_rounding = _MM_GET_ROUNDING_MODE();
 	_MM_SET_ROUNDING_MODE(_MM_ROUND_DOWN);
+	#endif
 
 	assert( parms->minidx % SIMD_SIZ == 0 );
 	assert( parms->count % SIMD_SIZ == 0 );
@@ -79,21 +88,23 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 	{
 		__m256 idx_x, idx_y, idx_z;
 
+		#if !defined(VECTORIZE_GRIDCALC)
 		//__m256 idx0_x, idx0_y, idx0_z;
 		//TODO: if dim_* are 2^n, the grid-indices calculation is just bit-mask+offset
-		//TODO: vectorize
-		//for ( int i=0,n=SIMD_SIZ; i<n; ++i )
-		//{
-		//	//int ii = SIMD_SIZ*idx_block + i;
-		//	int32_t ix =  ii.m256i_i32[i] % (dim_x);
-		//	int32_t iy = (ii.m256i_i32[i] / dim_x) % dim_y;
-		//	int32_t iz =  ii.m256i_i32[i] / (dim_x*dim_y);
-		//
-		//	idx_x.m256_f32[i] = (float32_t)ix;
-		//	idx_y.m256_f32[i] = (float32_t)iy;
-		//	idx_z.m256_f32[i] = (float32_t)iz;
-		//}
+		for ( int i=0,n=SIMD_SIZ; i<n; ++i )
+		{
+			//int ii = SIMD_SIZ*idx_block + i;
+			int32_t ix =  ii.m256i_i32[i] % (dim_x);
+			int32_t iy = (ii.m256i_i32[i] / dim_x) % dim_y;
+			int32_t iz =  ii.m256i_i32[i] / (dim_x*dim_y);
+		
+			idx_x.m256_f32[i] = (float32_t)ix;
+			idx_y.m256_f32[i] = (float32_t)iy;
+			idx_z.m256_f32[i] = (float32_t)iz;
+		}
+		#endif
 
+		#if defined(VECTORIZE_GRIDCALC)
 		{
 			//note: example
 			//2x2x2=8
@@ -117,6 +128,7 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 			idx_x = _mm256_sub_ps( fi, izxy_iyx );
 			//idx_x = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_x)); //note: floor
 		}
+		#endif
 
 		//note: debug-check
 		//for ( int i=0,n=SIMD_SIZ; i<n; ++i )
@@ -142,13 +154,22 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 		d_min = _mm256_sqrt_ps(d_min);
 
 		_mm256_store_ps( out_data, d_min );
+		//_mm256_stream_ps( out_data, d_min );
+
 		out_data += SIMD_SIZ;
 
-		//ii = _mm256_add_epi32( ii, _mm256_set1_epi32(SIMD_SIZ) );
+		#if !defined(VECTORIZE_GRIDCALC)
+		ii = _mm256_add_epi32( ii, _mm256_set1_epi32(SIMD_SIZ) );
+		#endif
+
+		#if defined(VECTORIZE_GRIDCALC)
 		fi = _mm256_add_ps( fi, _mm256_set1_ps(SIMD_SIZ) );
+		#endif
 	}
 
+	#if defined(VECTORIZE_GRIDCALC)
 	_MM_SET_ROUNDING_MODE(_mm_rounding);
+	#endif
 }
 
 // ====

@@ -398,7 +398,8 @@ void eval_sdf__precalc_simd_8grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 				d_min = _mm256_sqrt_ps(d_min);
 
 				int idx = SIMD_SIZ*xc + y*sdf.header.dim_x + z*sdf.header.dim_x*sdf.header.dim_y;
-				_mm256_store_ps( sdf.data+idx, d_min );
+				//_mm256_store_ps( sdf.data+idx, d_min );
+				_mm256_stream_ps( sdf.data+idx, d_min );
 
 				p_x = _mm256_add_ps( p_x, stepsiz8_x );
 			}
