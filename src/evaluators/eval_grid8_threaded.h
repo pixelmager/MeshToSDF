@@ -178,7 +178,7 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 }
 
 // ====
-void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * const mesh )
+void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * const mesh, const cpuinfo_t &cpuinfo )
 {
 	PROFILE_FUNC();
 
@@ -197,7 +197,7 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell
 
-	const int32_t num_cores = get_num_cores().num_cores_logical;
+	const int32_t num_cores = cpuinfo.num_cores_logical;
 	//const int32_t num_cores = std::thread::hardware_concurrency();
 	int32_t num_hwthreads = num_cores;
 

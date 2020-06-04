@@ -112,6 +112,8 @@ int main()
 	bool path_avx256 = InstructionSet::AVX2();
 	bool path_avx512 = InstructionSet::AVX512F();
 
+	cpuinfo_t cpuinfo = calc_num_cores();
+
 	//system("pause");
 
 	init_timers();
@@ -186,7 +188,7 @@ int main()
         if ( path_avx512 )
         {
             const uint64_t t0 = gettime_ms();
-            eval_sdf__grid16_threaded( sdf, mesh );
+            eval_sdf__grid16_threaded( sdf, mesh, cpuinfo );
             const uint64_t t1 = gettime_ms();
             printf( "AVX512: %dms\n", (int)(t1-t0) );
         }
@@ -194,21 +196,21 @@ int main()
         if ( path_avx256 )
         {
             const uint64_t t0 = gettime_ms();
-            eval_sdf__grid8_threaded(sdf, mesh);
+            eval_sdf__grid8_threaded(sdf, mesh, cpuinfo);
             const uint64_t t1 = gettime_ms();
             printf( "AVX2(256): %dms\n", (int)(t1-t0) );
         }
 
         {
             const uint64_t t0 = gettime_ms();
-            eval_sdf__grid4_threaded(sdf, mesh);
+            eval_sdf__grid4_threaded(sdf, mesh, cpuinfo);
             const uint64_t t1 = gettime_ms();
             printf( "SSE(128) %dms\n", (int)(t1-t0) );
         }
 
         {
             const uint64_t t0 = gettime_ms();
-            eval_sdf__precalc_threaded(sdf, mesh);
+            eval_sdf__precalc_threaded(sdf, mesh, cpuinfo);
             const uint64_t t1 = gettime_ms();
             printf( "scalar %dms\n", (int)(t1-t0) );
         }

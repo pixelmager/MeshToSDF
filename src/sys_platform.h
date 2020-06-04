@@ -357,14 +357,14 @@ DWORD getDefaultThreadCount() {
     return count;
 }
 
-struct cores_t
+struct cpuinfo_t
 {
     int32_t num_cores_physical;
     int32_t num_cores_logical;
 };
 
 //int main(int argc, char* argv[]) {
-cores_t get_num_cores()
+cpuinfo_t calc_num_cores()
 {
     char vendor[13];
     getCpuidVendor(vendor);
@@ -386,9 +386,9 @@ cores_t get_num_cores()
     DWORD threads = getDefaultThreadCount();
     printf("Default Thread Count: %u\n", threads);
 
-    cores_t c;
-    c.num_cores_logical = logical;
-    c.num_cores_physical = cores;
+    cpuinfo_t ci;
+    ci.num_cores_logical = logical;
+    ci.num_cores_physical = cores;
 
-    return c;
+    return ci;
 }

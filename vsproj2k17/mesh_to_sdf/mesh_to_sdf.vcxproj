@@ -265,6 +265,7 @@
     <ClInclude Include="..\..\src\evaluators\eval_grid16.h" />
     <ClInclude Include="..\..\src\evaluators\eval_grid16_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\eval_grid4.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid4_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\eval_grid8.h" />
     <ClInclude Include="..\..\src\evaluators\eval_grid8_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\eval_precalc.h" />
