@@ -128,15 +128,15 @@ int main()
 	//
 	//enum { GRID_SIZ_X = 16, GRID_SIZ_Y = 16, GRID_SIZ_Z = 16 };
 	//enum { GRID_SIZ_X = 32, GRID_SIZ_Y = 32, GRID_SIZ_Z = 32 };
-	enum { GRID_SIZ_X = 64, GRID_SIZ_Y = 64, GRID_SIZ_Z = 64 };
-	//enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
+	//enum { GRID_SIZ_X = 64, GRID_SIZ_Y = 64, GRID_SIZ_Z = 64 };
+	enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
 
 	//note: assimp import to trimesh
 	PROFILE_ENTER("loadmodel");
-	indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/sphere.obj" );
+	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/sphere.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/pyramid_blob.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/tetra_nonormals.obj" );
-	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/bunny.obj" );
+	indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/bunny.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/tigre_sumatra_sketchfab.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/DeformedPigs.fbx" );
 	PROFILE_LEAVE("loadmodel");
@@ -188,7 +188,7 @@ int main()
             const uint64_t t0 = gettime_ms();
             eval_sdf__grid16_threaded( sdf, mesh );
             const uint64_t t1 = gettime_ms();
-            printf( "%dms\n", (int)(t1-t0) );
+            printf( "AVX512: %dms\n", (int)(t1-t0) );
         }
 
         if ( path_avx256 )
@@ -196,25 +196,23 @@ int main()
             const uint64_t t0 = gettime_ms();
             eval_sdf__grid8_threaded(sdf, mesh);
             const uint64_t t1 = gettime_ms();
-            printf( "%dms\n", (int)(t1-t0) );
+            printf( "AVX2(256): %dms\n", (int)(t1-t0) );
         }
-        //else
-        //    printf("avx256 not supported\n");
-		//
-        //{
-        //    const uint64_t t0 = gettime_ms();
-        //    eval_sdf__grid4_threaded(sdf, mesh);
-        //    const uint64_t t1 = gettime_ms();
-        //    printf( "%dms\n", (int)(t1-t0) );
-        //}
-		//
-        //{
-        //    const uint64_t t0 = gettime_ms();
-        //    eval_sdf__precalc_threaded(sdf, mesh);
-        //    const uint64_t t1 = gettime_ms();
-        //    printf( "%dms\n", (int)(t1-t0) );
-        //}
-		//
+
+        {
+            const uint64_t t0 = gettime_ms();
+            eval_sdf__grid4_threaded(sdf, mesh);
+            const uint64_t t1 = gettime_ms();
+            printf( "SSE(128) %dms\n", (int)(t1-t0) );
+        }
+
+        {
+            const uint64_t t0 = gettime_ms();
+            eval_sdf__precalc_threaded(sdf, mesh);
+            const uint64_t t1 = gettime_ms();
+            printf( "scalar %dms\n", (int)(t1-t0) );
+        }
+		
         ////eval_sdf__aos_threaded( sdf, mesh );
 		//
 		////eval_sdf__simd_soa_4tris( sdf, mesh );

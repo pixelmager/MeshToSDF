@@ -407,18 +407,6 @@ namespace lpt {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// ====
-int32_t get_num_cores()
-{
-	SYSTEM_INFO sysinfo;
-	GetSystemInfo(&sysinfo);
-	return sysinfo.dwNumberOfProcessors;
-}
-
-// TODO: check avx/sse support
-// https://github.com/Mysticial/FeatureDetector/blob/master/src/x86/cpu_x86.cpp
-// https://docs.microsoft.com/en-gb/cpp/intrinsics/cpuid-cpuidex?view=vs-2017
-
 
 ///////////////////////////////////////////////////////////////////////////////
 

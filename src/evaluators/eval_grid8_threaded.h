@@ -15,8 +15,8 @@ struct workload_grid8_parms_t
 	//note: variable across threads
 	int32_t minidx;
 	int32_t count;
-	#ifndef NDEBUG
 	int32_t threadidx;
+	#ifndef NDEBUG
 	char const * threadname;
 	#endif //NDEBUG
 };
@@ -24,6 +24,11 @@ struct workload_grid8_parms_t
 // ====
 void workload_grid8( workload_grid8_parms_t const * const parms )
 {
+	GROUP_AFFINITY group{};
+	group.Mask = (KAFFINITY)-1;
+	group.Group = parms->threadidx & 1;
+	BOOL r = SetThreadGroupAffinity(GetCurrentThread(), &group, nullptr);
+
 	//#define VECTORIZE_GRIDCALC
 
 	enum { SIMD_SIZ=8, SIMD_ALIGN=4*SIMD_SIZ };
@@ -192,7 +197,8 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell
 
-	const int32_t num_cores = get_num_cores();
+	const int32_t num_cores = get_num_cores().num_cores_logical;
+	//const int32_t num_cores = std::thread::hardware_concurrency();
 	int32_t num_hwthreads = num_cores;
 
 	std::vector<std::thread> threads;
@@ -230,6 +236,8 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 		//global
 		//TODO: move to separate struct
 		{
+			parms[idx_thread].threadidx = idx_thread; //threads[i].get_id();
+
 			parms[idx_thread].p0 = p0;
 			parms[idx_thread].stepsiz = stepsiz;
 
@@ -243,8 +251,6 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 		{
 			threadnames[idx_thread] = std::string("thread_") + lpt::to_string(idx_thread);
 			printf( "\"%s\" [%d;%d[ count=%d\n", threadnames[idx_thread].c_str(), parms[idx_thread].minidx, parms[idx_thread].minidx + parms[idx_thread].count, parms[idx_thread].count );
-
-			parms[idx_thread].threadidx = idx_thread; //threads[i].get_id();
 			parms[idx_thread].threadname = threadnames[idx_thread].c_str();
 		}
 		#endif //NDEBUG

@@ -121,7 +121,7 @@ void eval_sdf__grid4_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell
 
-	const int32_t num_cores = get_num_cores();
+	const int32_t num_cores = get_num_cores().num_cores_logical;
 	int32_t num_hwthreads = num_cores;
 
 	std::vector<std::thread> threads;

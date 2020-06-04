@@ -73,7 +73,7 @@ void eval_sdf__precalc_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell, -stepsiz for loop-init
 
-	const int num_cores = get_num_cores();
+	const int32_t num_cores = get_num_cores().num_cores_logical;
 	const int num_threads = num_cores;
 
 	std::vector<std::thread> threads;
