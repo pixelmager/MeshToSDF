@@ -9,8 +9,8 @@ struct workload_precalc_parms_t
 	vec3_t p0;
 	vec3_t stepsiz;
 
-	#ifndef NDEBUG
 	int32_t threadidx;
+	#ifndef NDEBUG
 	char const * threadname;
 	#endif
 
@@ -24,6 +24,12 @@ struct workload_precalc_parms_t
 
 void workload_precalc( workload_precalc_parms_t const * const parms )
 {
+	//note: from https://twitter.com/id_aa_carmack/status/1249071471219150858?lang=en
+	GROUP_AFFINITY group{};
+	group.Mask = (KAFFINITY)-1;
+	group.Group = parms->threadidx & 1;
+	/*BOOL r =*/ SetThreadGroupAffinity(GetCurrentThread(), &group, nullptr);
+
 	#ifndef NDEBUG
 	PROFILE_THREADNAME( parms->threadname );
 	#endif
@@ -56,9 +62,10 @@ void workload_precalc( workload_precalc_parms_t const * const parms )
 		}
 	}
 }
-void eval_sdf__precalc_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * const mesh, const cpuinfo_t &cpuinfo )
+void eval_sdf__precalc_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * const mesh, int32_t num_threads )
 {
-	printf("%s\n", __FUNCTION__);
+    PROFILE_FUNC();
+	//printf("%s\n", __FUNCTION__);
 
 	aabb_t bb;
 	bb.mn = vec3_t( sdf.header.bb_mn_x, sdf.header.bb_mn_y, sdf.header.bb_mn_z );
@@ -73,8 +80,8 @@ void eval_sdf__precalc_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell, -stepsiz for loop-init
 
-	const int32_t num_cores = cpuinfo.num_cores_logical;
-	const int num_threads = num_cores;
+	//const int32_t num_cores = cpuinfo.num_cores_logical;
+	//const int num_threads = num_cores;
 
 	std::vector<std::thread> threads;
 	threads.reserve( num_threads );
@@ -101,14 +108,13 @@ void eval_sdf__precalc_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const 
 			parms[i].minidx = i * num_per_thread;
 			parms[i].count  = min( num_per_thread, sdf.header.dim_z - parms[i].minidx );
 		}
+		parms[i].threadidx = i; //threads[i].get_id();
 
 		//debug
 		#ifndef NDEBUG
 		{
 			threadnames[i] = std::string("thread_") + lpt::to_string(i);
 			//printf( "%s: [%d;%d[\n", threadnames[i].c_str(), parms[i].minidx, parms[i].minidx + parms[i].count );
-			
-			parms[i].threadidx = i; //threads[i].get_id();
 			parms[i].threadname = threadnames[i].c_str();
 		}
 		#endif //NDEBUG

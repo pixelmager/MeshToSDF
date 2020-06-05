@@ -615,6 +615,8 @@ void eval_sdf__precalc_simd_4grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 	PROFILE_ENTER( "precalc" );
 	printf("%s\n", __FUNCTION__);
 
+	enum { SIMD_SIZ=4 };
+
 	aabb_t bb;
 	bb.mn = vec3_t( sdf.header.bb_mn_x, sdf.header.bb_mn_y, sdf.header.bb_mn_z );
 	bb.mx = vec3_t( sdf.header.bb_mx_x, sdf.header.bb_mx_y, sdf.header.bb_mx_z );
@@ -627,16 +629,20 @@ void eval_sdf__precalc_simd_4grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 								   bb_range.y / static_cast<float32_t>(sdf.header.dim_y),
 								   bb_range.z / static_cast<float32_t>(sdf.header.dim_z) );
 	
-	__m128 stepsiz4_x = _mm_set1_ps( 4.0f * stepsiz.x );
+	__m128 stepsiz4_x = _mm_set1_ps( SIMD_SIZ * stepsiz.x );
 	__m128 stepsiz_y = _mm_set1_ps( stepsiz.y );
 	__m128 stepsiz_z = _mm_set1_ps( stepsiz.z );
 
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell
 
-	const __m128 p_x0 = _mm_set_ps( p0.x + 3.0f * stepsiz.x,
-									p0.x + 2.0f * stepsiz.x,
-									p0.x + 1.0f * stepsiz.x,
-									p0.x + 0.0f * stepsiz.x );
+	//const __m128 p_x0 = _mm_set_ps( p0.x + 3.0f * stepsiz.x,
+	//								p0.x + 2.0f * stepsiz.x,
+	//								p0.x + 1.0f * stepsiz.x,
+	//								p0.x + 0.0f * stepsiz.x );
+	__m128 p_x0;
+	for ( int i=0;i<SIMD_SIZ; ++i )
+		p_x0.m128_f32[i] = p0.x + i * stepsiz.x;
+
 	const __m128 p_y0 = _mm_set1_ps( p0.y );
 	const __m128 p_z0 = _mm_set1_ps( p0.z );
 
@@ -644,18 +650,18 @@ void eval_sdf__precalc_simd_4grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 	__m128 p_y = p_y0;
 	__m128 p_z = p_z0;
 
-	assert( sdf.header.dim_x % 4 == 0 );
+	assert( sdf.header.dim_x % SIMD_SIZ == 0 );
 
 	PROFILE_ENTER( "cell" );
 	for ( int z=0,zn=sdf.header.dim_z; z<zn; ++z )
 	{
 		for ( int y=0,yn=sdf.header.dim_y; y<yn; ++y )
 		{
-			for ( int xc=0,xn=sdf.header.dim_x/4; xc<xn; ++xc )
+			for ( int xc=0,xn=sdf.header.dim_x/SIMD_SIZ; xc<xn; ++xc )
 			{
 				//#define DEBUG_LEVEL_PARANOID
 				#if !defined(NDEBUG) && defined( DEBUG_LEVEL_PARANOID )
-				vec3_t p_nm = vec3_t( (static_cast<float32_t>(4*xc)+0.5f) / static_cast<float32_t>(sdf.header.dim_x),
+				vec3_t p_nm = vec3_t( (static_cast<float32_t>(SIMD_SIZ*xc)+0.5f) / static_cast<float32_t>(sdf.header.dim_x),
 									  (static_cast<float32_t>(y)+0.5f) / static_cast<float32_t>(sdf.header.dim_y),
 									  (static_cast<float32_t>(z)+0.5f) / static_cast<float32_t>(sdf.header.dim_z) );
 				vec3_t ps = bb.mn + bb_range * p_nm;
@@ -668,21 +674,21 @@ void eval_sdf__precalc_simd_4grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 				
 				//DEBUG
 				//#ifndef NDEBUG
-				//for (int i=0;i<4;++i ) dbg_p1.push_back( vec3_t(p_x.m128_f32[i], p_y.m128_f32[i], p_z.m128_f32[i] ) );
+				//for (int i=0;i<SIMD_SIZ;++i ) dbg_p1.push_back( vec3_t(p_x.m128_f32[i], p_y.m128_f32[i], p_z.m128_f32[i] ) );
 				//#endif //NDEBUG
 
 				assert( mesh->tri_indices.size() % 3 == 0 );
 				for ( size_t idx_tri=0,num_tris=mesh->tri_indices.size()/3; idx_tri<num_tris; ++idx_tri )
 				{
-					//d_min = _mm_min_ps( d_min, udTriangle_sq_precalc_SIMD_4grid( p_x, p_y, p_z, tpc[idx_tri] ) );
 					d_min = _mm_min_ps( d_min, udTriangle_sq_precalc_SIMD_4grid( p_x, p_y, p_z, tpc, idx_tri ) );
 				}
 
 				d_min = _mm_sqrt_ps(d_min);
 
 				//TODO: potential issue with concurrency? (shouldn't be but maybe? add checks)
-				int idx = 4*xc + y*sdf.header.dim_x + z*sdf.header.dim_x*sdf.header.dim_y;
-				_mm_store_ps( sdf.data+idx, d_min );
+				int idx = SIMD_SIZ*xc + y*sdf.header.dim_x + z*sdf.header.dim_x*sdf.header.dim_y;
+				//_mm_store_ps( sdf.data+idx, d_min );
+				_mm_stream_ps( sdf.data+idx, d_min );
 
 				p_x = _mm_add_ps( p_x, stepsiz4_x );
 			}

@@ -45,9 +45,10 @@
 using namespace lpt;
 
 // ====
-void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_z )
+void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_z, int32_t simd_siz )
 {
-	enum { SIMD_SIZ = 16, SIMD_ALIGN=4*SIMD_SIZ };
+	//enum { SIMD_SIZ = 16, SIMD_ALIGN=4*SIMD_SIZ };
+	const int32_t simd_align = sizeof(float32_t) * simd_siz;
 
 	sdf->header.dim_x = siz_x;
 	sdf->header.dim_y = siz_y;
@@ -67,11 +68,20 @@ void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_
 	sdf->header.bb_mx_y = bb.mx.y;
 	sdf->header.bb_mx_z = bb.mx.z;
 
-	sdf->data = (float32_t*)_aligned_malloc( sizeof(float32_t) * sdf->header.dim_x * sdf->header.dim_y * sdf->header.dim_z, SIMD_ALIGN );
+	sdf->data = (float32_t*)_aligned_malloc( sizeof(float32_t) * sdf->header.dim_x * sdf->header.dim_y * sdf->header.dim_z, simd_align );
 
 	#ifndef NDEBUG
-	sdf->eval_points = (vec3_t*)_aligned_malloc( 3*sizeof(float32_t) * sdf->header.dim_x * sdf->header.dim_y * sdf->header.dim_z, SIMD_ALIGN );
+	sdf->eval_points = (vec3_t*)_aligned_malloc( 3*sizeof(float32_t) * sdf->header.dim_x * sdf->header.dim_y * sdf->header.dim_z, simd_align );
 	#endif //NDEBUG
+}
+
+void deinit_sdf( sdf_t *sdf )
+{
+	_aligned_free( sdf->data );
+
+	#ifndef NDEBUG
+	_aligned_free( sdf->eval_points );
+	#endif
 }
 
 void print_support( bool print_matching )
@@ -102,6 +112,12 @@ void print_support( bool print_matching )
 //      https://github.com/janba/GEL/blob/master/src/demo/MeshDistance/meshdist.cpp
 int main()
 {
+    #ifndef NDEBUG
+    printf( "==================\n===== DEBUG ======\n==================\n\n");
+    #endif
+
+	printf( "CPU: \"%s\"\n", InstructionSet::Brand().c_str() );
+
 	printf( "supported extensions: ");
 	print_support( true );
 	
@@ -128,10 +144,10 @@ int main()
 	//enum { GRID_SIZ_X = 50, GRID_SIZ_Y = 50, GRID_SIZ_Z = 50 };
 	//enum { GRID_SIZ_X = 100, GRID_SIZ_Y = 100, GRID_SIZ_Z = 100 };
 	//
-	//enum { GRID_SIZ_X = 16, GRID_SIZ_Y = 16, GRID_SIZ_Z = 16 };
+	enum { GRID_SIZ_X = 16, GRID_SIZ_Y = 16, GRID_SIZ_Z = 16 };
 	//enum { GRID_SIZ_X = 32, GRID_SIZ_Y = 32, GRID_SIZ_Z = 32 };
 	//enum { GRID_SIZ_X = 64, GRID_SIZ_Y = 64, GRID_SIZ_Z = 64 };
-	enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
+	//enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
 
 	//note: assimp import to trimesh
 	PROFILE_ENTER("loadmodel");
@@ -158,9 +174,9 @@ int main()
 	}
 
 	sdf_t sdf;
-	init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z );
+	//init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z );
 
-	printf( "tris: %d\ngrid(%d,%d,%d)\n", (int)mesh->tri_indices.size()/3, sdf.header.dim_x, sdf.header.dim_y, sdf.header.dim_z );
+	printf( "tris: %d\ngrid(%d,%d,%d)\n", (int)mesh->tri_indices.size()/3, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z );
 
 	//#define DO_MULTIPLE_TIMINGS
 	#if defined ( DO_MULTIPLE_TIMINGS )
@@ -187,33 +203,54 @@ int main()
 
         if ( path_avx512 )
         {
-            const uint64_t t0 = gettime_ms();
-            eval_sdf__grid16_threaded( sdf, mesh, cpuinfo );
-            const uint64_t t1 = gettime_ms();
-            printf( "AVX512: %dms\n", (int)(t1-t0) );
+            printf( "\nAVX512(16-wide, ms):\n" );
+			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 16 );
+            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
+            {
+                const uint64_t t0 = gettime_ms();
+                eval_sdf__grid16_threaded( sdf, mesh, i );
+                const uint64_t t1 = gettime_ms();
+                printf( "%d\n", (int)(t1-t0) );
+            }
         }
 
         if ( path_avx256 )
         {
-            const uint64_t t0 = gettime_ms();
-            eval_sdf__grid8_threaded(sdf, mesh, cpuinfo);
-            const uint64_t t1 = gettime_ms();
-            printf( "AVX2(256): %dms\n", (int)(t1-t0) );
+            printf( "\nAVX2(8-wide, ms):\n" );
+			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 8 );
+            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
+            {
+                const uint64_t t0 = gettime_ms();
+                eval_sdf__grid8_threaded( sdf, mesh, i );
+                const uint64_t t1 = gettime_ms();
+                printf( "%d\n", (int)(t1-t0) );
+            }
         }
 
         {
-            const uint64_t t0 = gettime_ms();
-            eval_sdf__grid4_threaded(sdf, mesh, cpuinfo);
-            const uint64_t t1 = gettime_ms();
-            printf( "SSE(128) %dms\n", (int)(t1-t0) );
+            printf( "\nSSE(4-wide, ms):\n" );
+			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 4 );
+            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
+            {
+                const uint64_t t0 = gettime_ms();
+                eval_sdf__grid4_threaded( sdf, mesh, i );
+                const uint64_t t1 = gettime_ms();
+                printf( "%d\n", (int)(t1-t0) );
+            }
         }
 
         {
-            const uint64_t t0 = gettime_ms();
-            eval_sdf__precalc_threaded(sdf, mesh, cpuinfo);
-            const uint64_t t1 = gettime_ms();
-            printf( "scalar %dms\n", (int)(t1-t0) );
+            printf( "\nScalar(single, ms):\n" );
+			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 1 );
+            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
+            {
+                const uint64_t t0 = gettime_ms();
+                eval_sdf__precalc_threaded( sdf, mesh, i );
+                const uint64_t t1 = gettime_ms();
+                printf( "%d\n", (int)(t1-t0) );
+            }
         }
+
 		
         ////eval_sdf__aos_threaded( sdf, mesh );
 		//
@@ -357,7 +394,8 @@ int main()
 
 	//printf( "timings: load %dms, sdf %dms, sdf_bf %dms\n", (int)(t11_ms-t0_ms), (int)(t12_ms-t11_ms), (int)(t22_ms-t21_ms) );
 
-	_aligned_free( sdf.data );
+	//_aligned_free( sdf.data );
+	deinit_sdf( &sdf );
 
 	system("pause");
 

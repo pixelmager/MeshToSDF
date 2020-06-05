@@ -376,6 +376,7 @@ void eval_sdf__precalc_simd_8grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 	assert( sdf.header.dim_x >= SIMD_SIZ );
 	assert( sdf.header.dim_x % SIMD_SIZ == 0 );
 
+	PROFILE_ENTER( "cell" );
 	for ( int z=0,zn=sdf.header.dim_z; z<zn; ++z )
 	{
 		for ( int y=0,yn=sdf.header.dim_y; y<yn; ++y )
@@ -397,6 +398,7 @@ void eval_sdf__precalc_simd_8grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 
 				d_min = _mm256_sqrt_ps(d_min);
 
+
 				int idx = SIMD_SIZ*xc + y*sdf.header.dim_x + z*sdf.header.dim_x*sdf.header.dim_y;
 				//_mm256_store_ps( sdf.data+idx, d_min );
 				_mm256_stream_ps( sdf.data+idx, d_min );
@@ -409,6 +411,7 @@ void eval_sdf__precalc_simd_8grid( sdf_t &sdf, lpt::indexed_triangle_mesh_t cons
 		p_y = p_y0;
 		p_z = _mm256_add_ps( p_z, stepsiz_z );
 	} //for-z
+	PROFILE_LEAVE("cell");
 
 	_aligned_free( tpc );
 }

@@ -24,10 +24,11 @@ struct workload_grid8_parms_t
 // ====
 void workload_grid8( workload_grid8_parms_t const * const parms )
 {
+    //note: from https://twitter.com/id_aa_carmack/status/1249071471219150858?lang=en
 	GROUP_AFFINITY group{};
 	group.Mask = (KAFFINITY)-1;
 	group.Group = parms->threadidx & 1;
-	BOOL r = SetThreadGroupAffinity(GetCurrentThread(), &group, nullptr);
+	/*BOOL r =*/ SetThreadGroupAffinity(GetCurrentThread(), &group, nullptr);
 
 	//#define VECTORIZE_GRIDCALC
 
@@ -79,11 +80,11 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 		fi.m256_f32[i] = (float32_t)(parms->minidx + i);
 	#endif
 
-	#if defined(VECTORIZE_GRIDCALC)
+	//#if defined(VECTORIZE_GRIDCALC)
 	//TODO: replace with rounding funct-parms instead
-	int _mm_rounding = _MM_GET_ROUNDING_MODE();
-	_MM_SET_ROUNDING_MODE(_MM_ROUND_DOWN);
-	#endif
+	//int _mm_rounding = _MM_GET_ROUNDING_MODE();
+	//_MM_SET_ROUNDING_MODE(_MM_ROUND_DOWN);
+	//#endif
 
 	assert( parms->minidx % SIMD_SIZ == 0 );
 	assert( parms->count % SIMD_SIZ == 0 );
@@ -120,13 +121,15 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 			
 			//iz = idx/(x*y)
 			idx_z = _mm256_fmadd_ps( fi, rcp_fdxy, rcp_fdxy_half ); //TODO: HACK, float-precision
-			idx_z = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_z)); //note: floor
+			//idx_z = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_z)); //note: floor
+            idx_z = _mm256_round_ps(idx_z, _MM_FROUND_FLOOR);
 		
 			//iy = (idx - iz*x*y)/x
 			__m256 izxy = _mm256_mul_ps(idx_z, fdxy);
 			idx_y = _mm256_sub_ps(fi, izxy);
 			idx_y = _mm256_fmadd_ps( idx_y, rcp_fdx, rcp_fdx_half ); //TODO: HACK, float-precision
-			idx_y = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_y)); //note: floor
+			//idx_y = _mm256_cvtepi32_ps(_mm256_cvtps_epi32(idx_y)); //note: floor
+            idx_y = _mm256_round_ps(idx_y, _MM_FROUND_FLOOR);
 		
 			//ix = idx - iy*y - iz*x*y
 			__m256 izxy_iyx = _mm256_fmadd_ps(idx_y, fdx, izxy);
@@ -172,13 +175,13 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 		#endif
 	}
 
-	#if defined(VECTORIZE_GRIDCALC)
-	_MM_SET_ROUNDING_MODE(_mm_rounding);
-	#endif
+	//#if defined(VECTORIZE_GRIDCALC)
+	//_MM_SET_ROUNDING_MODE(_mm_rounding);
+	//#endif
 }
 
 // ====
-void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * const mesh, const cpuinfo_t &cpuinfo )
+void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * const mesh, int32_t num_threads )
 {
 	PROFILE_FUNC();
 
@@ -197,35 +200,35 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell
 
-	const int32_t num_cores = cpuinfo.num_cores_logical;
+	//const int32_t num_cores = cpuinfo.num_cores_logical;
 	//const int32_t num_cores = std::thread::hardware_concurrency();
-	int32_t num_hwthreads = num_cores;
+	//int32_t num_threads = num_cores;
 
 	std::vector<std::thread> threads;
-	threads.reserve( num_hwthreads );
+	threads.reserve( num_threads );
 
 	//tri_precalc_simd_soa_t * const tpc = precalc_simd_soa( mesh );
 	//tri_precalc_simd_aos_t * const tpc = precalc_simd_aos( mesh );
 	tri_precalc_interleaved_t * const tpc = precalc_tridata_interleaved( mesh );
 
 	PROFILE_ENTER("spawn threads");
-	workload_grid8_parms_t * const parms = (workload_grid8_parms_t*)_aligned_malloc( num_hwthreads*sizeof(workload_grid8_parms_t), SIMD_ALIGN );
+	workload_grid8_parms_t * const parms = (workload_grid8_parms_t*)_aligned_malloc( num_threads*sizeof(workload_grid8_parms_t), SIMD_ALIGN );
 
 	#ifndef NDEBUG
-	std::string *threadnames = new std::string[ num_hwthreads ];
+	std::string *threadnames = new std::string[ num_threads ];
 	#endif //NDEBUG
 	
 	const int32_t num_cells             = sdf.header.dim_x * sdf.header.dim_y * sdf.header.dim_z;
 	const int32_t num_blocks            = num_cells / BLOCK_SIZ;
-	const int32_t num_blocks_per_thread = static_cast<int>( ceilf( (float)num_blocks/ (float)num_hwthreads) );
+	const int32_t num_blocks_per_thread = static_cast<int>( ceilf( (float)num_blocks/ (float)num_threads) );
 	const int32_t num_cells_per_thread  = num_blocks_per_thread * BLOCK_SIZ;
 	const int32_t num_cells_evaluated   = num_blocks * BLOCK_SIZ;
 	const int32_t num_cells_remaining   = num_cells - num_cells_evaluated;
-	for ( int idx_thread=0,n_thread=num_hwthreads; idx_thread<n_thread; ++idx_thread )
+	for ( int idx_thread=0,n_thread=num_threads; idx_thread<n_thread; ++idx_thread )
 	{
 		// per thread
 		{
-            assert( idx_thread < num_hwthreads );
+            assert( idx_thread < num_threads );
 			parms[idx_thread].minidx = idx_thread * num_cells_per_thread;
 			parms[idx_thread].count  = min( num_cells_per_thread, num_cells_evaluated - parms[idx_thread].minidx );
 			assert( parms[idx_thread].count % SIMD_SIZ == 0 );
@@ -258,7 +261,7 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 		threads.push_back( std::thread( workload_grid8, &(parms[idx_thread]) ) );
 	}
 	#ifndef NDEBUG
-	printf( "# spawned %d/%d threads\n  remaining cells: %d\n", (int)threads.size(), num_hwthreads, num_cells_remaining );
+	printf( "# spawned %d/%d threads\n  remaining cells: %d\n", (int)threads.size(), num_threads, num_cells_remaining );
 	#endif
 
 	PROFILE_LEAVE("spawn threads");

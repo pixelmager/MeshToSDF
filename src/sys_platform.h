@@ -4,7 +4,7 @@
 // Uses the __cpuid intrinsic to get information about
 // CPU extended instruction set support.
 // note: from https://docs.microsoft.com/en-gb/cpp/intrinsics/cpuid-cpuidex?view=vs-2017
-
+//
 // also: check avx/sse support
 // https://github.com/Mysticial/FeatureDetector/blob/master/src/x86/cpu_x86.cpp
 // https://docs.microsoft.com/en-gb/cpp/intrinsics/cpuid-cpuidex?view=vs-2017
