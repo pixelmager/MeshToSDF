@@ -74,13 +74,13 @@ struct tri_precalc_interleaved_t
 	vec3_t v2;
 	vec3_t v3;
 
+	vec3_t rcp_dp2_v21_v32_v13;
+
 	vec3_t nor;
 
 	vec3_t cp0;
 	vec3_t cp1;
 	vec3_t cp2;
-
-	vec3_t rcp_dp2_v21_v32_v13;
 
 	float32_t rcp_dp2_nor;
 };
