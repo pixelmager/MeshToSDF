@@ -126,6 +126,7 @@
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <FloatingPointModel>Fast</FloatingPointModel>
       <FloatingPointExceptions>false</FloatingPointExceptions>
+      <PreprocessorDefinitions>MICROPROFILE_USE_CONFIG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)..\\deps\\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -270,11 +271,6 @@
     <ClInclude Include="..\..\src\evaluators\eval_grid8_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\eval_precalc.h" />
     <ClInclude Include="..\..\src\evaluators\eval_precalc_threaded.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_tris16.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_tris4.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_tris8.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_vectorsimd.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_vectorsimd_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\precalc.h" />
     <ClInclude Include="..\..\src\lpt_model.h" />
     <ClInclude Include="..\..\src\microprofile\microprofile.h" />

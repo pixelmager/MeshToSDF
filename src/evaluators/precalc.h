@@ -4,87 +4,24 @@
 
 using namespace lpt;
 
+
 struct tri_precalc_t
 {
 	vec3_t v1;
 	vec3_t v2;
 	vec3_t v3;
-	vec3_t v21;
-	vec3_t v32;
-	vec3_t v13;
+
+	vec3_t rcp_dp2_v21_v32_v13;
 
 	vec3_t nor;
+
 	vec3_t cp0;
 	vec3_t cp1;
 	vec3_t cp2;
 
-	vec3_t rcp_dp2_v21_v32_v13;
-
 	float32_t rcp_dp2_nor;
 };
-
 tri_precalc_t* precalc_tridata( lpt::indexed_triangle_mesh_t const * const mesh )
-{
-	PROFILE_FUNC();
-	
-	tri_precalc_t * const tpc = (tri_precalc_t*)_aligned_malloc( sizeof(tri_precalc_t) * (mesh->tri_indices.size() / 3 ), 16 );
-
-	assert( mesh->positions.size() % 3 == 0 );
-	vec3_t const * const positions = reinterpret_cast<vec3_t const * const>( &mesh->positions[0] );
-
-	for ( size_t idx_tri=0,num_tris=mesh->tri_indices.size()/3; idx_tri<num_tris; ++idx_tri )
-	{
-		const uint32_t idx0 = mesh->tri_indices[ 3*idx_tri+0 ];
-		const uint32_t idx1 = mesh->tri_indices[ 3*idx_tri+1 ];
-		const uint32_t idx2 = mesh->tri_indices[ 3*idx_tri+2 ];
-		const vec3_t &pos_v1 = positions[ idx0 ];
-		const vec3_t &pos_v2 = positions[ idx1 ];
-		const vec3_t &pos_v3 = positions[ idx2 ];
-
-		tri_precalc_t &pc = tpc[ idx_tri ];
-		pc.v1 = pos_v1;
-		pc.v2 = pos_v2;
-		pc.v3 = pos_v3;
-
-		pc.v21 = sub(pc.v2, pc.v1);
-		pc.v32 = sub(pc.v3, pc.v2);
-		pc.v13 = sub(pc.v1, pc.v3);
-
-		pc.nor = cross(pc.v21, pc.v13);
-
-		pc.cp0 = cross(pc.v21, pc.nor);
-		pc.cp1 = cross(pc.v32, pc.nor);
-		pc.cp2 = cross(pc.v13, pc.nor);
-
-		pc.rcp_dp2_v21_v32_v13 = vec3_t(1.0f / length_sq(pc.v21),
-										1.0f / length_sq(pc.v32),
-										1.0f / length_sq(pc.v13) );
-
-		pc.rcp_dp2_nor = 1.0f / length_sq(pc.nor);
-	}
-
-	return tpc;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-struct tri_precalc_interleaved_t
-{
-	vec3_t v1;
-	vec3_t v2;
-	vec3_t v3;
-
-	vec3_t rcp_dp2_v21_v32_v13;
-
-	vec3_t nor;
-
-	vec3_t cp0;
-	vec3_t cp1;
-	vec3_t cp2;
-
-	float32_t rcp_dp2_nor;
-};
-tri_precalc_interleaved_t* precalc_tridata_interleaved( lpt::indexed_triangle_mesh_t const * const mesh )
 {
 	PROFILE_FUNC();
 
@@ -92,7 +29,7 @@ tri_precalc_interleaved_t* precalc_tridata_interleaved( lpt::indexed_triangle_me
 	
 	assert( mesh->tri_indices.size() % 3 == 0 );
 	const size_t num_tris = mesh->tri_indices.size() / 3;
-	tri_precalc_interleaved_t * const tpc = (tri_precalc_interleaved_t*)_aligned_malloc( sizeof(tri_precalc_interleaved_t) * num_tris, SIMD_ALIGN );
+	tri_precalc_t * const tpc = (tri_precalc_t*)_aligned_malloc( sizeof(tri_precalc_t) * num_tris, SIMD_ALIGN );
 
 	assert( mesh->positions.size() % 3 == 0 );
 	vec3_t const * const positions = reinterpret_cast<vec3_t const * const>( &mesh->positions[0] );
@@ -106,7 +43,7 @@ tri_precalc_interleaved_t* precalc_tridata_interleaved( lpt::indexed_triangle_me
 		const vec3_t &pos_v2 = positions[ idx1 ];
 		const vec3_t &pos_v3 = positions[ idx2 ];
 
-		tri_precalc_interleaved_t &pc = tpc[ idx_tri ];
+		tri_precalc_t &pc = tpc[ idx_tri ];
 		pc.v1 = pos_v1;
 		pc.v2 = pos_v2;
 		pc.v3 = pos_v3;

@@ -1,3 +1,5 @@
+#pragma once
+
 // InstructionSet.cpp
 // Compile by using: cl /EHsc /W4 InstructionSet.cpp
 // processor: x86, x64
@@ -200,82 +202,29 @@ private:
 // Initialize static member data
 const InstructionSet::InstructionSet_Internal InstructionSet::CPU_Rep;
 
-/*
-// Print out supported instruction set extensions
-int main()
+void print_support( bool print_matching )
 {
-    auto& outstream = std::cout;
+	#define LPT_FNC(M) InstructionSet::M()
+	#define LPT_DOPRINT(M) if(print_matching == LPT_FNC(M) ) printf( #M ## " " )
+	LPT_DOPRINT( SSE );
+	LPT_DOPRINT( SSE2 );
+	LPT_DOPRINT( SSE3 );
+	LPT_DOPRINT( SSE41 );
+	LPT_DOPRINT( SSE42 );
+	LPT_DOPRINT( SSE4a );
+	LPT_DOPRINT( SSSE3 );
 
-    auto support_message = [&outstream](std::string isa_feature, bool is_supported) {
-        outstream << isa_feature << (is_supported ? " supported" : " not supported") << std::endl;
-    };
+	LPT_DOPRINT( AVX );
+	LPT_DOPRINT( AVX2 );
+	LPT_DOPRINT( AVX512CD );
+	LPT_DOPRINT( AVX512ER );
+	LPT_DOPRINT( AVX512F );
+	LPT_DOPRINT( AVX512PF );
 
-    std::cout << InstructionSet::Vendor() << std::endl;
-    std::cout << InstructionSet::Brand() << std::endl;
-
-    support_message("3DNOW",       InstructionSet::_3DNOW());
-    support_message("3DNOWEXT",    InstructionSet::_3DNOWEXT());
-    support_message("ABM",         InstructionSet::ABM());
-    support_message("ADX",         InstructionSet::ADX());
-    support_message("AES",         InstructionSet::AES());
-    support_message("AVX",         InstructionSet::AVX());
-    support_message("AVX2",        InstructionSet::AVX2());
-    support_message("AVX512CD",    InstructionSet::AVX512CD());
-    support_message("AVX512ER",    InstructionSet::AVX512ER());
-    support_message("AVX512F",     InstructionSet::AVX512F());
-    support_message("AVX512PF",    InstructionSet::AVX512PF());
-    support_message("BMI1",        InstructionSet::BMI1());
-    support_message("BMI2",        InstructionSet::BMI2());
-    support_message("CLFSH",       InstructionSet::CLFSH());
-    support_message("CMPXCHG16B",  InstructionSet::CMPXCHG16B());
-    support_message("CX8",         InstructionSet::CX8());
-    support_message("ERMS",        InstructionSet::ERMS());
-    support_message("F16C",        InstructionSet::F16C());
-    support_message("FMA",         InstructionSet::FMA());
-    support_message("FSGSBASE",    InstructionSet::FSGSBASE());
-    support_message("FXSR",        InstructionSet::FXSR());
-    support_message("HLE",         InstructionSet::HLE());
-    support_message("INVPCID",     InstructionSet::INVPCID());
-    support_message("LAHF",        InstructionSet::LAHF());
-    support_message("LZCNT",       InstructionSet::LZCNT());
-    support_message("MMX",         InstructionSet::MMX());
-    support_message("MMXEXT",      InstructionSet::MMXEXT());
-    support_message("MONITOR",     InstructionSet::MONITOR());
-    support_message("MOVBE",       InstructionSet::MOVBE());
-    support_message("MSR",         InstructionSet::MSR());
-    support_message("OSXSAVE",     InstructionSet::OSXSAVE());
-    support_message("PCLMULQDQ",   InstructionSet::PCLMULQDQ());
-    support_message("POPCNT",      InstructionSet::POPCNT());
-    support_message("PREFETCHWT1", InstructionSet::PREFETCHWT1());
-    support_message("RDRAND",      InstructionSet::RDRAND());
-    support_message("RDSEED",      InstructionSet::RDSEED());
-    support_message("RDTSCP",      InstructionSet::RDTSCP());
-    support_message("RTM",         InstructionSet::RTM());
-    support_message("SEP",         InstructionSet::SEP());
-    support_message("SHA",         InstructionSet::SHA());
-    support_message("SSE",         InstructionSet::SSE());
-    support_message("SSE2",        InstructionSet::SSE2());
-    support_message("SSE3",        InstructionSet::SSE3());
-    support_message("SSE4.1",      InstructionSet::SSE41());
-    support_message("SSE4.2",      InstructionSet::SSE42());
-    support_message("SSE4a",       InstructionSet::SSE4a());
-    support_message("SSSE3",       InstructionSet::SSSE3());
-    support_message("SYSCALL",     InstructionSet::SYSCALL());
-    support_message("TBM",         InstructionSet::TBM());
-    support_message("XOP",         InstructionSet::XOP());
-    support_message("XSAVE",       InstructionSet::XSAVE());
+	LPT_DOPRINT( FMA );
+	#undef LPT_FNC
+	#undef LPT_DOPRINT
 }
-*/
-
-/*
-int32_t get_num_cores()
-{
-    SYSTEM_INFO sysinfo;
-    GetSystemInfo(&sysinfo);
-    return sysinfo.dwNumberOfProcessors;
-}
-*/
-
 
 //note: reference https://gpuopen.com/learn/cpu-core-count-detection-windows/
 // https://gpuopen.com/gdc-presentations/2019/gdc-2019-s2-amd-ryzen-processor-software-optimization.pdf
@@ -363,7 +312,6 @@ struct cpuinfo_t
     int32_t num_cores_logical;
 };
 
-//int main(int argc, char* argv[]) {
 cpuinfo_t calc_num_cores()
 {
     char vendor[13];

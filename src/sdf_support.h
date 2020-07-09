@@ -12,7 +12,7 @@
 #define NOMINMAX
 #include <Windows.h>
 
-#include <intrin.h>
+//#include <intrin.h>
 #include <immintrin.h>
 //#include <zmmintrin.h>
 
@@ -254,13 +254,13 @@ namespace lpt
 
 #define ALIGN16 _declspec(align(16))
 
-#define SPLAT4_X( V ) _mm_shuffle_ps((V),(V),_MM_SHUFFLE(0,0,0,0))
-#define SPLAT4_Y( V ) _mm_shuffle_ps((V),(V),_MM_SHUFFLE(1,1,1,1))
-#define SPLAT4_Z( V ) _mm_shuffle_ps((V),(V),_MM_SHUFFLE(2,2,2,2))
+//#define SPLAT4_X( V ) _mm_shuffle_ps((V),(V),_MM_SHUFFLE(0,0,0,0))
+//#define SPLAT4_Y( V ) _mm_shuffle_ps((V),(V),_MM_SHUFFLE(1,1,1,1))
+//#define SPLAT4_Z( V ) _mm_shuffle_ps((V),(V),_MM_SHUFFLE(2,2,2,2))
 
-#define SPLAT16_X(V) _mm512_maskz_broadcastss_ps(0xffffU, _mm_shuffle_ps((V),(V),_MM_SHUFFLE(0,0,0,0)) )
-#define SPLAT16_Y(V) _mm512_maskz_broadcastss_ps(0xffffU, _mm_shuffle_ps((V),(V),_MM_SHUFFLE(1,1,1,1)) )
-#define SPLAT16_Z(V) _mm512_maskz_broadcastss_ps(0xffffU, _mm_shuffle_ps((V),(V),_MM_SHUFFLE(2,2,2,2)) )
+//#define SPLAT16_X(V) _mm512_maskz_broadcastss_ps(0xffffU, _mm_shuffle_ps((V),(V),_MM_SHUFFLE(0,0,0,0)) )
+//#define SPLAT16_Y(V) _mm512_maskz_broadcastss_ps(0xffffU, _mm_shuffle_ps((V),(V),_MM_SHUFFLE(1,1,1,1)) )
+//#define SPLAT16_Z(V) _mm512_maskz_broadcastss_ps(0xffffU, _mm_shuffle_ps((V),(V),_MM_SHUFFLE(2,2,2,2)) )
 
 // ====
 //note: from https://stackoverflow.com/questions/41315420/how-to-implement-sign-function-with-sse3
@@ -279,7 +279,8 @@ namespace lpt
 //	return _mm_blendv_ps( _mm_set1_ps(-1.0f), _mm_set1_ps(1.0f), x );
 //}
 
-inline __m128 sign( const __m128 x )
+inline
+__m128 sign( const __m128 x )
 {
 	const __m128 zeros = _mm_setzero_ps();
 	
@@ -289,7 +290,8 @@ inline __m128 sign( const __m128 x )
 	return _mm_blendv_ps( ret, _mm_set1_ps(-1.0f), m1 );
 }
 
-inline __m256 sign( const __m256 x )
+inline
+__m256 sign( const __m256 x )
 {
 	const __m256 zeros = _mm256_setzero_ps();
 	const __m256 m0 = _mm256_cmp_ps( x, zeros, _CMP_GT_OQ );
@@ -298,6 +300,7 @@ inline __m256 sign( const __m256 x )
 	return _mm256_blendv_ps( ret, _mm256_set1_ps(-1.0f), m1 );
 }
 
+inline
 __m512 sign( const __m512 x )
 {
 	const __m512 zeros = _mm512_setzero_ps();
@@ -308,7 +311,9 @@ __m512 sign( const __m512 x )
 	return _mm512_mask_blend_ps( m1, ret, _mm512_set1_ps( -1.0f) );	
 }
 
+
 ///////////////////////////////////////////////////////////////////////////////
+
 
 #include <vector>
 #include <string>
@@ -360,7 +365,7 @@ namespace lpt {
 		return R_to_string( input_var );
 	}
 
-	std::string time_to_string( const int64_t &time_ms );
+	//std::string time_to_string( const int64_t &time_ms );
 
 	//////////////////////////////////////////////////////////////////////////
 
@@ -433,7 +438,7 @@ struct header_t
 struct sdf_t
 {
 	header_t header;
-	float32_t *data;
+	float32_t *data = nullptr;
 
 	#ifndef NDEBUG
 	vec3_t *eval_points;
