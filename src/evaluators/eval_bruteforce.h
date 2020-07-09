@@ -7,6 +7,7 @@
 
 //note: from http://iquilezles.org/www/articles/triangledistance/triangledistance.htm
 float32_t dot2( const vec3_t &v ) { return dot(v,v); }
+
 float32_t udTriangle( const vec3_t &v1, const vec3_t &v2, const vec3_t &v3, const vec3_t &p )
 {
     vec3_t v21 = v2 - v1; vec3_t p1 = p - v1;
@@ -32,7 +33,6 @@ float32_t udTriangle_sq( const vec3_t &v1, const vec3_t &v2, const vec3_t &v3, c
     vec3_t v13 = v1 - v3; vec3_t p3 = p - v3;
     vec3_t nor = cross( v21, v13 );
 
-    //return sqrtf((sign(dot(cross(v21,nor),p1)) + 
 	return ((sign(dot(cross(v21,nor),p1)) + 
              sign(dot(cross(v32,nor),p2)) + 
              sign(dot(cross(v13,nor),p3))<2.0f) 
@@ -69,7 +69,6 @@ void eval_sdf__bruteforce( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * cons
 							  (static_cast<float32_t>(z)+0.5f) / static_cast<float32_t>(zn) );
 		vec3_t p = bb.mn + bb_range * p_nm;
 
-		//TODO: alternatively calculate few tris for a bunch of grid-cells to fetch less often?
 		assert( mesh->tri_indices.size() % 3 == 0 );
 		for ( size_t idx_tri=0,num_tris=mesh->tri_indices.size()/3; idx_tri<num_tris; ++idx_tri )
 		{

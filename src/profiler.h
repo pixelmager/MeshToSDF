@@ -16,8 +16,6 @@
 
 #if ( USE_PROFILER == PROFILER_MICROPROFILE )
 
-//#define MICROPROFILE_ENABLED 1
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <string>
@@ -25,6 +23,7 @@
 #include <atomic>
 //#include "unistd.h"
 
+//note: config is in microprofile.config.h
 //define MICROPROFILE_WEBSERVER_MAXFRAMES 100
 #include "microprofile\microprofile.h"
 
@@ -56,6 +55,7 @@ void deinit_profiler()
 	printf( "\nmicroprofile outputting..." );
 	MicroProfileDumpFileImmediately("sdf_profile.html", nullptr, nullptr);
 	MicroProfileShutdown();
+	printf( " done\n" );
 }
 
 //MICROPROFILE_DECLARE_LOCAL_ATOMIC_COUNTER(ThreadsStarted);
@@ -65,7 +65,11 @@ void deinit_profiler()
 
 #elif ( USE_PROFILER == PROFILER_SUPERLUMINAL )
 
+#ifndef NDEBUG
+#pragma comment( lib, "PerformanceAPI_MDd" )
+#else
 #pragma comment( lib, "PerformanceAPI_MD" )
+#endif
 
 #include <Superluminal/PerformanceAPI.h>
 

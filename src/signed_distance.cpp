@@ -1,25 +1,11 @@
 #include <sdf_support.h>
 #include <lpt_model.h>
-
 #include <sys_platform.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#include <evaluators/eval_bruteforce.h>
-#include <evaluators/eval_precalc.h>
-
-#include <evaluators/eval_vectorsimd.h>
-#include <evaluators/eval_vectorsimd_threaded.h>
-
-#include <evaluators/eval_grid4.h>
-#include <evaluators/eval_grid8.h>
-#include <evaluators/eval_grid16.h>
-
-#include <evaluators/eval_tris4.h>
-#include <evaluators/eval_tris8.h>
-#include <evaluators/eval_tris16.h>
-
 #include <evaluators/eval_precalc_threaded.h>
+
 #include <evaluators/eval_grid4_threaded.h>
 #include <evaluators/eval_grid8_threaded.h>
 #include <evaluators/eval_grid16_threaded.h>
@@ -42,7 +28,6 @@
 // https://deplinenoise.files.wordpress.com/2015/03/gdc2015_afredriksson_simd.pdf
 // http://www.cs.uu.nl/docs/vakken/magr/2017-2018/files/SIMD%20Tutorial.pdf
 
-using namespace lpt;
 
 // ====
 void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_z, int32_t simd_siz )
@@ -75,6 +60,7 @@ void init_sdf( sdf_t *sdf, aabb_t bb, int32_t siz_x, int32_t siz_y, int32_t siz_
 	#endif //NDEBUG
 }
 
+// ====
 void deinit_sdf( sdf_t *sdf )
 {
 	_aligned_free( sdf->data );
@@ -84,34 +70,59 @@ void deinit_sdf( sdf_t *sdf )
 	#endif
 }
 
-void print_support( bool print_matching )
+
+// ==============================================================
+
+bool equals_sdf( sdf_t const * const s01, sdf_t const * const s02 )
 {
-	#define LPT_FNC(M) InstructionSet::M()
-	#define LPT_DOPRINT(M) if(print_matching == LPT_FNC(M) ) printf( #M ## " " )
-	LPT_DOPRINT( SSE );
-	LPT_DOPRINT( SSE2 );
-	LPT_DOPRINT( SSE3 );
-	LPT_DOPRINT( SSE41 );
-	LPT_DOPRINT( SSE42 );
-	LPT_DOPRINT( SSE4a );
-	LPT_DOPRINT( SSSE3 );
-
-	LPT_DOPRINT( AVX );
-	LPT_DOPRINT( AVX2 );
-	LPT_DOPRINT( AVX512CD );
-	LPT_DOPRINT( AVX512ER );
-	LPT_DOPRINT( AVX512F );
-	LPT_DOPRINT( AVX512PF );
-
-	LPT_DOPRINT( FMA );
-	#undef LPT_FNC
-	#undef LPT_DOPRINT
+	assert( s01 != nullptr && s01->data != nullptr );
+	assert( s02 != nullptr && s02->data != nullptr );
+	
+	const int32_t count = s01->header.dim_x * s01->header.dim_y * s01->header.dim_z;
+	assert( count == s02->header.dim_x * s02->header.dim_y * s02->header.dim_z );
+	return memcmp( s01->data, s02->data, sizeof(float32_t) * count ) == 0;
 }
 
-//TODO: precalc angle-weighted normals
-//      https://github.com/janba/GEL/blob/master/src/demo/MeshDistance/meshdist.cpp
-int main()
+bool equals_approximately_sdf( sdf_t const * const s01, sdf_t const * const s02 )
 {
+		bool equals = true;
+
+		assert( s01->header.dim_x == s02->header.dim_x );
+		assert( s01->header.dim_y == s02->header.dim_y );
+		assert( s01->header.dim_z == s02->header.dim_z );
+
+		float32_t mindiff =  FLT_MAX;
+		float32_t maxdiff = -FLT_MAX;
+		const int32_t count = s01->header.dim_x * s01->header.dim_y * s01->header.dim_z;
+		for ( int i=0,n=count; i<n; ++i )
+		{
+			const float32_t d0 = s01->data[ i ];
+			const float32_t d1 = s02->data[ i ];
+			if ( !AlmostEqualRelative( d0, d1) )
+			{
+				equals = false;
+				//printf("%#010x != %#010x\n", *(uint32_t*)&d0, *(uint32_t*)&d1);
+			}
+
+			float32_t diff = abs( d1 - d0 );
+			if ( diff < mindiff )
+				mindiff = diff;
+			if ( diff > maxdiff )
+				maxdiff = diff;
+		}
+
+		//if( mindiff < maxdiff ) printf( "delta: [min;max]=[%f;%f]\n", mindiff, maxdiff );
+		if( mindiff < maxdiff ) printf( "delta: [min;max]=[%.10e;%.10e]\n", mindiff, maxdiff );
+
+		return equals;
+}
+
+// ==============================================================
+
+int main( int argc, char *argv[] )
+{
+	setvbuf(stdout, NULL, _IONBF, 0);
+
     #ifndef NDEBUG
     printf( "==================\n===== DEBUG ======\n==================\n\n");
     #endif
@@ -125,12 +136,17 @@ int main()
 	print_support( false );
 	printf( "\n");
 
-	bool path_avx256 = InstructionSet::AVX2();
-	bool path_avx512 = InstructionSet::AVX512F();
+	const bool path_avx256 = InstructionSet::AVX2();
+	const bool path_avx512 = InstructionSet::AVX512F();
 
 	cpuinfo_t cpuinfo = calc_num_cores();
 
-	//system("pause");
+	bool maxload = false;
+	if ( argc > 1 && std::string(argv[1]) == std::string("--maxload") )
+	{
+		maxload = true;
+		printf("maxload, %d threads\n", cpuinfo.num_cores_logical);
+	}
 
 	init_timers();
 	init_profiler();
@@ -140,14 +156,11 @@ int main()
 
 	PROFILE_FUNC();
 
-	//enum { GRID_SIZ_X = 25, GRID_SIZ_Y = 25, GRID_SIZ_Z = 25 };
-	//enum { GRID_SIZ_X = 50, GRID_SIZ_Y = 50, GRID_SIZ_Z = 50 };
-	//enum { GRID_SIZ_X = 100, GRID_SIZ_Y = 100, GRID_SIZ_Z = 100 };
-	//
-	enum { GRID_SIZ_X = 16, GRID_SIZ_Y = 16, GRID_SIZ_Z = 16 };
-	//enum { GRID_SIZ_X = 32, GRID_SIZ_Y = 32, GRID_SIZ_Z = 32 };
-	//enum { GRID_SIZ_X = 64, GRID_SIZ_Y = 64, GRID_SIZ_Z = 64 };
-	//enum { GRID_SIZ_X = 128, GRID_SIZ_Y = 128, GRID_SIZ_Z = 128 };
+	const int test_siz = 64;
+	const int maxload_siz = 128;
+	const int GRID_SIZ_X = maxload ? maxload_siz : test_siz;
+	const int GRID_SIZ_Y = maxload ? maxload_siz : test_siz;
+	const int GRID_SIZ_Z = maxload ? maxload_siz : test_siz;
 
 	//note: assimp import to trimesh
 	PROFILE_ENTER("loadmodel");
@@ -156,14 +169,10 @@ int main()
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/tetra_nonormals.obj" );
 	indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/bunny.obj" );
 	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/tigre_sumatra_sketchfab.obj" );
-	//indexed_triangle_mesh_t const * const mesh = lpt::loadmodel_assimp__posonly( "../data/DeformedPigs.fbx" );
 	PROFILE_LEAVE("loadmodel");
 
 	assert( mesh->positions.size() % 3 == 0 );
 	vec3_t const * const positions = reinterpret_cast<vec3_t const * const>( &mesh->positions[0] );
-
-	//TODO: would it be an optimisation to convert indexed trimesh to pure triangle-array (would map better to simd?)
-	//TODO: build one-level grid of active cells
 
 	aabb_t bb;
 	for ( size_t i=0, in=mesh->positions.size()/3; i<in; ++i )
@@ -173,231 +182,130 @@ int main()
 		bb.mx = max( bb.mx, p );
 	}
 
-	sdf_t sdf;
-	//init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z );
-
 	printf( "tris: %d\ngrid(%d,%d,%d)\n", (int)mesh->tri_indices.size()/3, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z );
 
-	//#define DO_MULTIPLE_TIMINGS
-	#if defined ( DO_MULTIPLE_TIMINGS )
-	enum { NUM_ITER=7 };
-	std::vector<uint64_t> timings( NUM_ITER );
-	uint64_t t_min = INT_MAX;
-	uint64_t t_max = 0;
-	for ( int i=0,n=NUM_ITER; i<n; ++i )
-	#endif //DO_MULTIPLE_TIMINGS
+	sdf_t sdf;
+	sdf_t sdf_simd;
 
+	enum INSTR : int { SCALAR=0, SSE, AVX256, AVX512, INSTRCOUNT };
+	int instr = maxload ? INSTR::AVX512 : INSTR::SCALAR;
+	while ( instr >= 0 && instr < INSTR::INSTRCOUNT)
 	{
 		PROFILE_SCOPE("sdf_calc");
 
-		const uint64_t t0_ms = gettime_ms();
-		
-		//eval_sdf__bruteforce( sdf, mesh );
-		//eval_sdf__precalc (sdf, mesh );
-
-		//eval_sdf__precalc_simd_aos( sdf, mesh );
-
-		//eval_sdf__precalc_simd_4grid( sdf, mesh );
-		//eval_sdf__precalc_simd_8grid( sdf, mesh );
-		//eval_sdf__precalc_simd_16grid( sdf, mesh );
-
-        if ( path_avx512 )
-        {
-            printf( "\nAVX512(16-wide, ms):\n" );
-			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 16 );
-            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
-            {
-                const uint64_t t0 = gettime_ms();
-                eval_sdf__grid16_threaded( sdf, mesh, i );
-                const uint64_t t1 = gettime_ms();
-                printf( "%d\n", (int)(t1-t0) );
-            }
-        }
-
-        if ( path_avx256 )
-        {
-            printf( "\nAVX2(8-wide, ms):\n" );
-			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 8 );
-            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
-            {
-                const uint64_t t0 = gettime_ms();
-                eval_sdf__grid8_threaded( sdf, mesh, i );
-                const uint64_t t1 = gettime_ms();
-                printf( "%d\n", (int)(t1-t0) );
-            }
-        }
-
-        {
-            printf( "\nSSE(4-wide, ms):\n" );
-			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 4 );
-            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
-            {
-                const uint64_t t0 = gettime_ms();
-                eval_sdf__grid4_threaded( sdf, mesh, i );
-                const uint64_t t1 = gettime_ms();
-                printf( "%d\n", (int)(t1-t0) );
-            }
-        }
-
-        {
-            printf( "\nScalar(single, ms):\n" );
+		if ( instr == INSTR::SCALAR )
+		{
+			printf( "\nScalar(single, ms):\n" );
 			init_sdf( &sdf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 1 );
-            for ( int i=1,n=cpuinfo.num_cores_logical; i<=n; ++i )
-            {
-                const uint64_t t0 = gettime_ms();
-                eval_sdf__precalc_threaded( sdf, mesh, i );
-                const uint64_t t1 = gettime_ms();
-                printf( "%d\n", (int)(t1-t0) );
-            }
-        }
-
-		
-        ////eval_sdf__aos_threaded( sdf, mesh );
-		//
-		////eval_sdf__simd_soa_4tris( sdf, mesh );
-		////eval_sdf__simd_soa_8tris( sdf, mesh );
-		////eval_sdf__simd_soa_16tris( sdf, mesh );
-		//
-		//const uint64_t t1_ms = gettime_ms();
-		//
-		//#if defined ( DO_MULTIPLE_TIMINGS )
-		//timings[i] = t1_ms - t0_ms;
-		//t_min = std::min( t_min, timings[i] );
-		//t_max = std::max( t_max, timings[i] );
-		////printf( "timing %d: sdf %dms\n", i, (int)timings[i] );
-		//#else
-		//printf( "timing: sdf %dms\n", (int)(t1_ms-t0_ms) );
-		//#endif //DO_MULTIPLE_TIMINGS
-	}
-	
-	#if defined ( DO_MULTIPLE_TIMINGS )
-	std::sort( timings.begin(), timings.end() );
-	uint64_t t_med = timings[ timings.size()/2 + 1 ];
-	printf( "\n(min, med, max) = (%dms, %dms, %dms)\n\n", (int)t_min, (int)t_med, (int)t_max );
-	#endif //DO_MULTIPLE_TIMINGS
-
-	//#define DO_SANITY_CHECK
-	#ifdef DO_SANITY_CHECK
-	{
-		PROFILE_SCOPE("sanity_check");
-		printf( "\nsanity check...\n" );
-
-		sdf_t sdf_bf;
-		{
-			init_sdf( &sdf_bf, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z );
-			const uint64_t t0_ms = gettime_ms();
-			eval_sdf__bruteforce( sdf_bf, mesh );
-			//eval_sdf__4grid_threaded( sdf_bf, mesh );
-			//eval_sdf__precalc_simd_4grid( sdf_bf, mesh );
-			const uint64_t t1_ms = gettime_ms();
-			printf( "timing: sdf_bf %dms\n", (int)(t1_ms-t0_ms) );
-		}
-
-		bool sane = true;
-		//{
-		//	bool evalpoints_same = true;
-		//	for ( size_t i=0,n=sdf.header.dim_x*sdf.header.dim_y*sdf.header.dim_z; i<n; ++i )
-		//	{
-		//		bool same = true;
-		//		same = same && AlmostEqualRelative(sdf_bf.eval_points[i].x, sdf.eval_points[i].x );
-		//		same = same && AlmostEqualRelative(sdf_bf.eval_points[i].y, sdf.eval_points[i].y );
-		//		same = same && AlmostEqualRelative(sdf_bf.eval_points[i].z, sdf.eval_points[i].z );
-		//		//if ( same == false )
-		//		//	__debugbreak();
-		//		evalpoints_same = evalpoints_same && same;
-		//	}
-		//	printf("evalpoints: %d\n", evalpoints_same );
-		//	sane = sane && evalpoints_same;
-		//}
-		{
-			assert( sdf_bf.header.dim_x == sdf.header.dim_x );
-			assert( sdf_bf.header.dim_y == sdf.header.dim_y );
-			assert( sdf_bf.header.dim_z == sdf.header.dim_z );
-
-			float32_t mindiff =  FLT_MAX;
-			float32_t maxdiff = -FLT_MAX;
-			for ( int i=0,n=sdf_bf.header.dim_x*sdf_bf.header.dim_y*sdf_bf.header.dim_z; i<n; ++i )
+			int i = maxload ? cpuinfo.num_cores_logical : 1;
+			for ( int n=cpuinfo.num_cores_logical; i<=n; ++i )
 			{
-				const float32_t d0 = sdf_bf.data[ i ];
-				const float32_t d1 = sdf.data[ i ];
-				if ( !AlmostEqualRelative( d0, d1) )
-				{
-					float32_t diff = abs( d1 - d0 );
-					if ( diff < mindiff ) mindiff = diff;
-					if ( diff > maxdiff ) maxdiff = diff;
-					sane = false;
-				}
+				const uint64_t t0 = gettime_ms();
+				eval_sdf__precalc_threaded( sdf, mesh, i );
+				const uint64_t t1 = gettime_ms();
+				printf( "%d\n", (int)(t1-t0) );
 			}
-			if( mindiff < maxdiff )
-				printf( "delta: [min;max]=[%f;%f]", mindiff, maxdiff );
 		}
-		printf( "\nbf vs pc sane: %d", sane );
-		
-		printf("\n");
 
-		_aligned_free( sdf_bf.data );
-	}
-	#endif //DO_SANITY_CHECK
+		//note: path_sse... assumed universally available...
+		if ( instr == INSTR::SSE)
+		{
+			printf("\nSSE(4-wide, ms):\n");
+			init_sdf(&sdf_simd, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 4);
 
+			#if (USE_PROFILER == PROFILER_MICROPROFILE )
+			MICROPROFILE_TIMELINE_ENTER_STATIC(MP_POWDERBLUE, "SSE");
+			#endif
+			int i = maxload ? cpuinfo.num_cores_logical : 1;
+			for ( int n = cpuinfo.num_cores_logical; i <= n; ++i)
+			{
+				const uint64_t t0 = gettime_ms();
+				eval_sdf__grid4_threaded(sdf_simd, mesh, i);
+				const uint64_t t1 = gettime_ms();
+				printf("%d\n", (int)(t1 - t0));
+			}
+
+			#if (USE_PROFILER == PROFILER_MICROPROFILE )
+			MICROPROFILE_TIMELINE_LEAVE_STATIC("SSE");
+			#endif
+
+			if (!maxload)
+			{
+				printf( "scalar == sse: %s\n", equals_sdf( &sdf, &sdf_simd) ? "true" : "false" );
+				printf( "scalar ~= sse: %s\n", equals_approximately_sdf( &sdf, &sdf_simd) ? "true" : "false" );
+			}
+		}
+
+		if ( instr == INSTR::AVX256 && path_avx256 )
+		{
+			printf( "\nAVX2(8-wide, ms):\n" );
+			init_sdf( &sdf_simd, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 8 );
+
+			#if (USE_PROFILER == PROFILER_MICROPROFILE )
+			MICROPROFILE_TIMELINE_ENTER_STATIC(MP_CHARTREUSE, "AVX256");
+			#endif
+			int i = maxload ? cpuinfo.num_cores_logical : 1;
+			for ( int n=cpuinfo.num_cores_logical; i<=n; ++i )
+			{
+				const uint64_t t0 = gettime_ms();
+				eval_sdf__grid8_threaded( sdf_simd, mesh, i );
+				const uint64_t t1 = gettime_ms();
+				printf( "%d\n", (int)(t1-t0) );
+			}
+
+			#if (USE_PROFILER == PROFILER_MICROPROFILE )
+			MICROPROFILE_TIMELINE_LEAVE_STATIC("AVX256");
+			#endif
+
+			if ( !maxload )
+			{
+				printf( "sse == avx256: %s\n", equals_sdf( &sdf, &sdf_simd) ? "true" : "false" );
+				printf( "sse ~= avx256: %s\n", equals_approximately_sdf( &sdf, &sdf_simd ) ? "true" : "false" );
+			}
+		}
+
+		if ( instr == INSTR::AVX512 && path_avx512 )
+		{
+			printf("\nAVX512(16-wide, ms):\n");
+			init_sdf(&sdf_simd, bb, GRID_SIZ_X, GRID_SIZ_Y, GRID_SIZ_Z, 16);
+
+			#if (USE_PROFILER == PROFILER_MICROPROFILE )
+			MICROPROFILE_TIMELINE_ENTER_STATIC(MP_SALMON, "AVX512");
+			#endif
+			int i = maxload ? cpuinfo.num_cores_logical : 1;
+			for ( int n = cpuinfo.num_cores_logical; i <= n; ++i)
+			{
+				const uint64_t t0 = gettime_ms();
+				eval_sdf__grid16_threaded(sdf_simd, mesh, i);
+				const uint64_t t1 = gettime_ms();
+				printf("%d\n", (int)(t1 - t0));
+			}
+			#if (USE_PROFILER == PROFILER_MICROPROFILE )
+			MICROPROFILE_TIMELINE_LEAVE_STATIC("AVX512");
+			#endif
+
+			if (!maxload )
+			{
+				printf("sse == avx512: %s\n", equals_sdf(&sdf, &sdf_simd) ? "true" : "false");
+				printf("sse ~= avx512: %s\n", equals_approximately_sdf(&sdf, &sdf_simd) ? "true" : "false");
+			}
+		}
+
+		instr = maxload ? --instr : ++instr;
+
+	} //while instr
+	
 	delete mesh;
 
-
-	{
-		FILE *f;
-		fopen_s( &f, "sdf.bin", "wb" ); //TODO: write to <filename>_128x128x128_sdf.bin
-		fwrite( &sdf.header, sizeof(header_t), 1, f );
-		fwrite( sdf.data, sizeof(float32_t) * sdf.header.dim_x * sdf.header.dim_y * sdf.header.dim_z, 1, f );
-		fclose( f );
-	}
-
-
-	//note: sanity check written data
 	//{
-	//	sdf_t sdf_sanity;
 	//	FILE *f;
-	//	fopen_s( &f, "sdf.bin", "rb" );
-	//	fread( &sdf_sanity.header, sizeof(header_t), 1, f );
-	//
-	//	sdf_sanity.data = new float32_t[ sdf_sanity.header.dim_x * sdf_sanity.header.dim_y * sdf_sanity.header.dim_z ];
-	//
-	//	fread( sdf_sanity.data, sizeof(float32_t), sdf_sanity.header.dim_x * sdf_sanity.header.dim_y * sdf_sanity.header.dim_z, f );
-	//	fclose(f);
-	//
-	//	//note: compare data
-	//	for ( int i=0,n=sdf.header.dim_x*sdf.header.dim_y*sdf.header.dim_z; i<n; ++i )
-	//	{
-	//		const float32_t d = sdf.data[ i ];
-	//		const float32_t d_sanity = sdf_sanity.data[ i ];
-	//		if ( d != d_sanity )
-	//		{
-	//			printf( "ARGH1" );
-	//		}
-	//	}
-	//
-	//	for ( int z=0,zn=sdf.header.dim_z; z<zn; ++z ) {
-	//	for ( int y=0,yn=sdf.header.dim_y; y<yn; ++y ) {
-	//	for ( int x=0,xn=sdf.header.dim_x; x<xn; ++x )
-	//	{
-	//		const int idx = x + y*xn + z*xn*yn;
-	//		const float32_t d = sdf.data[ idx ];
-	//		const float32_t d_sanity = sdf_sanity.data[ idx ];
-	//		if ( d != d_sanity )
-	//		{
-	//			printf( "ARGH2" );
-	//		}
-	//	}}}
-	//
-	//	delete [] sdf_sanity.data;
-	//}	
+	//	fopen_s( &f, "sdf.bin", "wb" ); //TODO: write to <filename>_128x128x128_sdf.bin
+	//	fwrite( &sdf.header, sizeof(header_t), 1, f );
+	//	fwrite( sdf.data, sizeof(float32_t) * sdf.header.dim_x * sdf.header.dim_y * sdf.header.dim_z, 1, f );
+	//	fclose( f );
+	//}
 
-	//const uint64_t t4_ms = gettime_ms();
-
-	//printf( "timings: load %dms, sdf %dms, sdf_bf %dms\n", (int)(t11_ms-t0_ms), (int)(t12_ms-t11_ms), (int)(t22_ms-t21_ms) );
-
-	//_aligned_free( sdf.data );
 	deinit_sdf( &sdf );
-
-	system("pause");
 
 	return 0;
 }

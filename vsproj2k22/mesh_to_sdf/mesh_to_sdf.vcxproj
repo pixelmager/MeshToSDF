@@ -126,6 +126,7 @@
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <FloatingPointModel>Fast</FloatingPointModel>
       <FloatingPointExceptions>false</FloatingPointExceptions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)..\\deps\\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -192,7 +193,7 @@
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <PreprocessorDefinitions>MICROPROFILE_USE_CONFIG;NDEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -257,7 +258,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\microprofile\microprofile.cpp" />
     <ClCompile Include="..\..\src\signed_distance.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -270,14 +270,8 @@
     <ClInclude Include="..\..\src\evaluators\eval_grid8_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\eval_precalc.h" />
     <ClInclude Include="..\..\src\evaluators\eval_precalc_threaded.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_tris16.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_tris4.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_tris8.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_vectorsimd.h" />
-    <ClInclude Include="..\..\src\evaluators\eval_vectorsimd_threaded.h" />
     <ClInclude Include="..\..\src\evaluators\precalc.h" />
     <ClInclude Include="..\..\src\lpt_model.h" />
-    <ClInclude Include="..\..\src\microprofile\microprofile.h" />
     <ClInclude Include="..\..\src\profiler.h" />
     <ClInclude Include="..\..\src\sdf_support.h" />
     <ClInclude Include="..\..\src\sys_platform.h" />

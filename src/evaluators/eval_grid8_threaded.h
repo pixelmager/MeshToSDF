@@ -2,6 +2,7 @@
 
 #include <sdf_support.h>
 #include <evaluators/precalc.h>
+#include <evaluators/eval_grid8.h>
 
 struct workload_grid8_parms_t
 {
@@ -9,7 +10,7 @@ struct workload_grid8_parms_t
 	vec3_t p0;
 	vec3_t stepsiz;
 	lpt::indexed_triangle_mesh_t const * mesh;
-	tri_precalc_interleaved_t const * tpc;
+	tri_precalc_t const * tpc;
 	sdf_t const * sdf;
 
 	//note: variable across threads
@@ -24,7 +25,8 @@ struct workload_grid8_parms_t
 // ====
 void workload_grid8( workload_grid8_parms_t const * const parms )
 {
-    //note: from https://twitter.com/id_aa_carmack/status/1249071471219150858?lang=en
+    //note: use multiple windows threadgroups to get around 64-threads-per-group limit
+	//      from https://twitter.com/id_aa_carmack/status/1249071471219150858?lang=en
 	GROUP_AFFINITY group{};
 	group.Mask = (KAFFINITY)-1;
 	group.Group = parms->threadidx & 1;
@@ -70,21 +72,15 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 	const __m256 fdxy = _mm256_mul_ps(fdx, fdy);
 	const __m256 rcp_fdx = _mm256_rcp_ps(fdx);
 	const __m256 rcp_fdxy = _mm256_rcp_ps(fdxy);
-	
-	const __m256 rcp_fdx_half = _mm256_mul_ps( rcp_fdx, _mm256_set1_ps(0.5f) ); //TODO: HACK
-	const __m256 rcp_fdxy_half = _mm256_mul_ps( rcp_fdxy, _mm256_set1_ps(0.5f) );  //TODO: HACK
-	
+		
 	#if defined(VECTORIZE_GRIDCALC)
+	const __m256 rcp_fdx_half = _mm256_mul_ps( rcp_fdx, _mm256_set1_ps(0.5f) ); //TODO: HACK float-precision
+	const __m256 rcp_fdxy_half = _mm256_mul_ps( rcp_fdxy, _mm256_set1_ps(0.5f) );  //TODO: HACK float-precision
+
 	__m256 fi;
 	for ( int i=0,n=SIMD_SIZ; i<n; ++i )
 		fi.m256_f32[i] = (float32_t)(parms->minidx + i);
 	#endif
-
-	//#if defined(VECTORIZE_GRIDCALC)
-	//TODO: replace with rounding funct-parms instead
-	//int _mm_rounding = _MM_GET_ROUNDING_MODE();
-	//_MM_SET_ROUNDING_MODE(_MM_ROUND_DOWN);
-	//#endif
 
 	assert( parms->minidx % SIMD_SIZ == 0 );
 	assert( parms->count % SIMD_SIZ == 0 );
@@ -161,8 +157,8 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 		}
 		d_min = _mm256_sqrt_ps(d_min);
 
-		_mm256_store_ps( out_data, d_min );
-		//_mm256_stream_ps( out_data, d_min );
+		//_mm256_store_ps( out_data, d_min );
+		_mm256_stream_ps( out_data, d_min );
 
 		out_data += SIMD_SIZ;
 
@@ -174,10 +170,6 @@ void workload_grid8( workload_grid8_parms_t const * const parms )
 		fi = _mm256_add_ps( fi, _mm256_set1_ps(SIMD_SIZ) );
 		#endif
 	}
-
-	//#if defined(VECTORIZE_GRIDCALC)
-	//_MM_SET_ROUNDING_MODE(_mm_rounding);
-	//#endif
 }
 
 // ====
@@ -188,6 +180,8 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	//printf("%s\n", __FUNCTION__);
 
 	enum { SIMD_SIZ=8, SIMD_ALIGN=4*SIMD_SIZ, BLOCK_SIZ=SIMD_SIZ };
+
+	PROFILE_ENTER("precalc");
 
 	aabb_t bb;
 	bb.mn = vec3_t( sdf.header.bb_mn_x, sdf.header.bb_mn_y, sdf.header.bb_mn_z );
@@ -200,18 +194,14 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	
 	const vec3_t p0 = bb.mn + 0.5f * stepsiz; //note: +0.5*stepsize to center at cell
 
-	//const int32_t num_cores = cpuinfo.num_cores_logical;
-	//const int32_t num_cores = std::thread::hardware_concurrency();
-	//int32_t num_threads = num_cores;
-
 	std::vector<std::thread> threads;
 	threads.reserve( num_threads );
 
-	//tri_precalc_simd_soa_t * const tpc = precalc_simd_soa( mesh );
-	//tri_precalc_simd_aos_t * const tpc = precalc_simd_aos( mesh );
-	tri_precalc_interleaved_t * const tpc = precalc_tridata_interleaved( mesh );
+	tri_precalc_t * const tpc = precalc_tridata( mesh );
 
+	PROFILE_LEAVE("precalc");
 	PROFILE_ENTER("spawn threads");
+
 	workload_grid8_parms_t * const parms = (workload_grid8_parms_t*)_aligned_malloc( num_threads*sizeof(workload_grid8_parms_t), SIMD_ALIGN );
 
 	#ifndef NDEBUG
@@ -265,12 +255,12 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	#endif
 
 	PROFILE_LEAVE("spawn threads");
-	PROFILE_ENTER("remaining cells");
 
 	//note: process num_cells_remaining on this thread
 	if ( num_cells_remaining > 0 )
 	{
-		
+		PROFILE_SCOPE("remaining cells");
+
 		assert( num_cells_remaining < SIMD_SIZ );
 		__m256 p_x = _mm256_set1_ps(0.0f);
 		__m256 p_y = _mm256_set1_ps(0.0f);
@@ -291,7 +281,6 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 		__m256 d_min = _mm256_set1_ps( FLT_MAX );
 		for ( size_t idx_tri=0; idx_tri<mesh->tri_indices.size()/3; ++idx_tri )
 		{
-			//d_min = _mm256_min_ps( d_min, udTriangle_sq_precalc_SIMD_8grid( p_x, p_y, p_z, parms->tpc, idx_tri ) );
 			d_min = _mm256_min_ps( d_min, udTriangle_sq_precalc_SIMD_8grid( p_x, p_y, p_z, parms->tpc[idx_tri] ) );
 		}
 		d_min = _mm256_sqrt_ps(d_min);
@@ -301,12 +290,12 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 			sdf.data[ ii ] = d_min.m256_f32[ i ];
 		}
 	}
-	PROFILE_LEAVE("remaining cells");
 
  	for ( size_t i=0,n=threads.size(); i<n; ++i )
 	{
 		threads[i].join();
 	}
+	threads.clear();
 
 	_aligned_free( parms );
 
@@ -316,4 +305,3 @@ void eval_sdf__grid8_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 
 	_aligned_free( tpc );
 }
-
