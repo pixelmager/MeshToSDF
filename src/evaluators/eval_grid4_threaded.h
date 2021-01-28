@@ -116,6 +116,8 @@ void eval_sdf__grid4_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 
 	enum { SIMD_SIZ=4, SIMD_ALIGN=4*SIMD_SIZ, BLOCK_SIZ=SIMD_SIZ };
 
+	PROFILE_ENTER( precalc );
+
 	aabb_t bb;
 	bb.mn = vec3_t( sdf.header.bb_mn_x, sdf.header.bb_mn_y, sdf.header.bb_mn_z );
 	bb.mx = vec3_t( sdf.header.bb_mx_x, sdf.header.bb_mx_y, sdf.header.bb_mx_z );
@@ -137,7 +139,9 @@ void eval_sdf__grid4_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	//tri_precalc_simd_aos_t * const tpc = precalc_simd_aos( mesh );
 	tri_precalc_interleaved_t * const tpc = precalc_tridata_interleaved( mesh );
 
-	PROFILE_ENTER("spawn threads");
+	PROFILE_LEAVE(precalc);
+	PROFILE_ENTER(spawn_threads);
+
 	workload_grid4_parms_t * const parms = (workload_grid4_parms_t*)_aligned_malloc( num_threads*sizeof(workload_grid4_parms_t), SIMD_ALIGN );
 
 	#ifndef NDEBUG
@@ -190,13 +194,13 @@ void eval_sdf__grid4_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 	printf( "# spawned %d/%d threads\n  remaining cells: %d\n", (int)threads.size(), num_threads, num_cells_remaining );
 	#endif
 
-	PROFILE_LEAVE("spawn threads");
-	PROFILE_ENTER("remaining cells");
+	PROFILE_LEAVE(spawn_threads);
 
 	//note: process num_cells_remaining on this thread
 	if ( num_cells_remaining > 0 )
 	{
-		
+		PROFILE_SCOPE(remaining_cells);		
+
 		assert( num_cells_remaining < SIMD_SIZ );
 		__m128 p_x = _mm_set1_ps(0.0f);
 		__m128 p_y = _mm_set1_ps(0.0f);

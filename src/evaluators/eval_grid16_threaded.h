@@ -103,6 +103,7 @@ void workload_grid16( workload_grid16_parms_t const * const parms )
 		PerformanceAPI::BeginEvent( "gridcell", profiler_buf );
 		#endif
 
+		PROFILE_ENTER(triangle);
 		__m512 d_min = D_MAX;
 		for ( size_t idx_tri=0; idx_tri<num_tris; ++idx_tri )
 		{
@@ -110,6 +111,7 @@ void workload_grid16( workload_grid16_parms_t const * const parms )
 			d_min = _mm512_min_ps( d_min, udTriangle_sq_precalc_SIMD_16grid( p_x, p_y, p_z, parms->tpc[idx_tri] ) ); //aos
 		}
 		d_min = _mm512_sqrt_ps(d_min);
+		PROFILE_LEAVE(triangle);
 
 		//_mm512_store_ps( out_data, d_min );
 		_mm512_stream_ps( out_data, d_min );
@@ -132,6 +134,8 @@ void eval_sdf__grid16_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const *
 
 	enum { SIMD_SIZ=16, SIMD_ALIGN=4*SIMD_SIZ, BLOCK_SIZ=SIMD_SIZ };
 
+	PROFILE_ENTER(precalc);
+
 	aabb_t bb;
 	bb.mn = vec3_t( sdf.header.bb_mn_x, sdf.header.bb_mn_y, sdf.header.bb_mn_z );
 	bb.mx = vec3_t( sdf.header.bb_mx_x, sdf.header.bb_mx_y, sdf.header.bb_mx_z );
@@ -153,7 +157,8 @@ void eval_sdf__grid16_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const *
 	//tri_precalc_simd_aos_t * const tpc = precalc_simd_aos( mesh );
 	tri_precalc_interleaved_t * const tpc = precalc_tridata_interleaved( mesh );
 
-	PROFILE_ENTER("spawn threads");
+	PROFILE_LEAVE(precalc);
+	PROFILE_ENTER(spawn_threads);
 	workload_grid16_parms_t * const parms = (workload_grid16_parms_t*)_aligned_malloc( num_threads*sizeof(workload_grid16_parms_t), SIMD_ALIGN );
 
 	#ifndef NDEBUG
@@ -205,13 +210,12 @@ void eval_sdf__grid16_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const *
 	printf( "# spawned %d/%d threads\n  remaining cells: %d\n", (int)threads.size(), num_threads, num_cells_remaining );
 	#endif
 
-	PROFILE_LEAVE("spawn threads");
-	PROFILE_ENTER("remaining cells");
+	PROFILE_LEAVE(spawn_threads);
 
 	//note: process num_cells_remaining on this thread
 	if ( num_cells_remaining > 0 )
 	{
-		
+		PROFILE_SCOPE(remaining_cells);
 		assert( num_cells_remaining < SIMD_SIZ );
 		__m512 p_x = _mm512_set1_ps(0.0f);
 		__m512 p_y = _mm512_set1_ps(0.0f);

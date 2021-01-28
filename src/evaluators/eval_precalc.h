@@ -5,6 +5,8 @@
 
 float32_t udTriangle_sq_precalc( const vec3_t &p, const tri_precalc_t &pc )
 {
+    PROFILE_FUNC();
+
 	const vec3_t p1 = p - pc.v1;
 	const vec3_t p2 = p - pc.v2;
 	const vec3_t p3 = p - pc.v3;

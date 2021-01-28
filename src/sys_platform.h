@@ -9,7 +9,6 @@
 // https://github.com/Mysticial/FeatureDetector/blob/master/src/x86/cpu_x86.cpp
 // https://docs.microsoft.com/en-gb/cpp/intrinsics/cpuid-cpuidex?view=vs-2017
 
-
 #include <iostream>
 #include <vector>
 #include <bitset>

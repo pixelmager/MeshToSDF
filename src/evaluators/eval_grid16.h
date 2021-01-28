@@ -174,6 +174,8 @@ __m512 udTriangle_sq_precalc_SIMD_16grid( const __m512 p_x, const __m512 p_y, co
 // ====
 __m512 udTriangle_sq_precalc_SIMD_16grid( const __m512 p_x, const __m512 p_y, const __m512 p_z, const tri_precalc_interleaved_t &pc )
 {
+	//PROFILE_FUNC();
+
 	const __m512 v1_x = _mm512_set1_ps(pc.v1.x);
 	const __m512 v1_y = _mm512_set1_ps(pc.v1.y);
 	const __m512 v1_z = _mm512_set1_ps(pc.v1.z);

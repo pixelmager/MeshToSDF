@@ -425,7 +425,7 @@ uint64_t gettime_ms()
 ///////////////////////////////////////////////////////////////////////////////
 
 struct header_t
-{ 
+{
 		int32_t dim_x, dim_y, dim_z;
 		float32_t bb_mn_x, bb_mn_y, bb_mn_z;
 		float32_t bb_mx_x, bb_mx_y, bb_mx_z;

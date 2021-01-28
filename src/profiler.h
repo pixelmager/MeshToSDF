@@ -3,9 +3,11 @@
 #define PROFILER_NONE 0
 #define PROFILER_MICROPROFILE 1
 #define PROFILER_SUPERLUMINAL 2
+#define PROFILER_TRACY 3
 
 //#define USE_PROFILER PROFILER_MICROPROFILE
 //#define USE_PROFILER PROFILER_SUPERLUMINAL
+//#define USE_PROFILER PROFILER_TRACY
 #define USE_PROFILER PROFILER_NONE
 
 //TODO: if (USE_PROFILER == PROFILER_MICROPROFILE)
@@ -35,9 +37,9 @@ enum { NUM_COLS=6};
 uint32_t colors[NUM_COLS] = { 0xFF6188,	0xA9DC76, 0xFFD866, 0xFC9867, 0xAB9DF2, 0x78DCE8 };
 int curcol = 0;
 
-#define PROFILE_ENTER(M) MICROPROFILE_ENTERI("defaultgroup", (M), colors[(curcol++)%NUM_COLS] )
+#define PROFILE_ENTER(M) MICROPROFILE_ENTERI("defaultgroup", (#M), colors[(curcol++)%NUM_COLS] )
 #define PROFILE_LEAVE(M) MICROPROFILE_LEAVE()
-#define PROFILE_SCOPE(M) MICROPROFILE_SCOPEI( "defaultgroup", (M), colors[(curcol++)%NUM_COLS] )
+#define PROFILE_SCOPE(M) MICROPROFILE_SCOPEI( "defaultgroup", (#M), colors[(curcol++)%NUM_COLS] )
 #define PROFILE_FUNC() MICROPROFILE_SCOPEI( "defaultgroup", __FUNCTION__, colors[(curcol++)%NUM_COLS] )
 
 #define PROFILE_THREADNAME(M) MicroProfileOnThreadCreate(M)
@@ -74,10 +76,27 @@ void deinit_profiler()
 void init_profiler() {}
 void deinit_profiler() {}
 #define PROFILE_FUNC() PERFORMANCEAPI_INSTRUMENT_FUNCTION()
-#define PROFILE_ENTER(M) PerformanceAPI::BeginEvent(M)
+#define PROFILE_ENTER(M) PerformanceAPI::BeginEvent(#M)
 #define PROFILE_LEAVE(M) PerformanceAPI::EndEvent()
-#define PROFILE_SCOPE(M) PERFORMANCEAPI_INSTRUMENT(M)
-#define PROFILE_THREADNAME(M) PerformanceAPI::SetCurrentThreadName(M)
+#define PROFILE_SCOPE(M) PERFORMANCEAPI_INSTRUMENT(#M)
+#define PROFILE_THREADNAME(M) PerformanceAPI::SetCurrentThreadName(#M)
+
+
+#elif( USE_PROFILER == PROFILER_TRACY )
+
+#pragma comment( lib, "DbgHelp.lib" )
+#include "tracy/TracyC.h"
+#include "tracy/Tracy.hpp"
+#include "Tracy/TracyClient.cpp"
+
+void init_profiler() {}
+void deinit_profiler() {}
+#define PROFILE_FUNC() ZoneScoped
+//#define PROFILE_ENTER(M) TracyCZoneN( TracyConcat(__tracy, __LINE__) ,(M),true)
+#define PROFILE_ENTER(M) TracyCZoneN( M, #M, true )
+#define PROFILE_LEAVE(M) TracyCZoneEnd(M)
+#define PROFILE_SCOPE(M) ZoneScopedN(#M)
+#define PROFILE_THREADNAME(M) TracyCSetThreadName(M)
 
 #else
 

@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\src\microprofile\microprofile.cpp" />
+    <ClCompile Include="..\..\src\signed_distance.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\evaluators\eval_bruteforce.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid16.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid16_threaded.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid4.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid4_threaded.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid8.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_grid8_threaded.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_precalc.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_precalc_threaded.h" />
+    <ClInclude Include="..\..\src\evaluators\precalc.h" />
+    <ClInclude Include="..\..\src\lpt_model.h" />
+    <ClInclude Include="..\..\src\microprofile\microprofile.h" />
+    <ClInclude Include="..\..\src\profiler.h" />
+    <ClInclude Include="..\..\src\sdf_support.h" />
+    <ClInclude Include="..\..\src\sys_platform.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_tris16.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_tris4.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_tris8.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_vectorsimd.h" />
+    <ClInclude Include="..\..\src\evaluators\eval_vectorsimd_threaded.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="tracy">
+      <UniqueIdentifier>{adbba41b-0d00-46b8-91fd-951a9907488c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

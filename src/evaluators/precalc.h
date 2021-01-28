@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sdf_support.h>
+#include <lpt_model.h>
 
 using namespace lpt;
 
