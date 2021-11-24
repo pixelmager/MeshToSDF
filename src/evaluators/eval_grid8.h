@@ -4,7 +4,7 @@
 #include <evaluators/precalc.h>
 
 // ====
-__m256 udTriangle_sq_precalc_SIMD_8grid( const __m256 p_x, const __m256 p_y, const __m256 p_z, const tri_precalc_t &pc )
+void udTriangle_sq_precalc_SIMD_8grid(const __m256 p_x, const __m256 p_y, const __m256 p_z, const tri_precalc_t& pc, __m256 &ret )
 {
 	const __m256 v1_x = _mm256_set1_ps(pc.v1.x);
 	const __m256 v1_y = _mm256_set1_ps(pc.v1.y);
@@ -166,7 +166,5 @@ __m256 udTriangle_sq_precalc_SIMD_8grid( const __m256 p_x, const __m256 p_y, con
 	sum = _mm256_add_ps( sum, sign3 );
 
 	__m256 cmp = _mm256_cmp_ps( sum, _mm256_set1_ps(2.0f), _CMP_LT_OQ );
-	__m256 res = _mm256_blendv_ps( res1, res0, cmp );
-
-	return res;
+	ret = _mm256_blendv_ps( res1, res0, cmp );	
 }

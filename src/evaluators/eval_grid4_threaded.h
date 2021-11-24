@@ -92,7 +92,11 @@ void workload_grid4( workload_grid4_parms_t const * const parms )
 		__m128 d_min = D_MAX;
 		for ( size_t idx_tri=0; idx_tri<num_tris; ++idx_tri )
 		{
-			d_min = _mm_min_ps( d_min, udTriangle_sq_precalc_SIMD_4grid( p_x, p_y, p_z, parms->tpc[idx_tri] ) ); //aos
+			//d_min = _mm_min_ps( d_min, udTriangle_sq_precalc_SIMD_4grid( p_x, p_y, p_z, parms->tpc[idx_tri] ) ); //aos
+			//
+			__m128 res;
+			udTriangle_sq_precalc_SIMD_4grid(p_x, p_y, p_z, parms->tpc[idx_tri], res); //aos
+			d_min = _mm_min_ps(d_min, res);
 		}
 		d_min = _mm_sqrt_ps(d_min);
 
@@ -213,7 +217,11 @@ void eval_sdf__grid4_threaded( sdf_t &sdf, lpt::indexed_triangle_mesh_t const * 
 		__m128 d_min = _mm_set1_ps( FLT_MAX );
 		for ( size_t idx_tri=0; idx_tri<mesh->tri_indices.size()/3; ++idx_tri )
 		{
-			d_min = _mm_min_ps( d_min, udTriangle_sq_precalc_SIMD_4grid( p_x, p_y, p_z, parms->tpc[idx_tri] ) );
+			//d_min = _mm_min_ps( d_min, udTriangle_sq_precalc_SIMD_4grid( p_x, p_y, p_z, parms->tpc[idx_tri] ) );
+			//
+			__m128 res;
+			udTriangle_sq_precalc_SIMD_4grid(p_x, p_y, p_z, parms->tpc[idx_tri], res);
+			d_min = _mm_min_ps(d_min, res);
 		}
 		d_min = _mm_sqrt_ps(d_min);
 		for ( int i=0,n=num_cells_remaining; i<n; ++i )

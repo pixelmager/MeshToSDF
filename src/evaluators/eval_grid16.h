@@ -4,7 +4,7 @@
 #include <evaluators/precalc.h>
 
 // ====
-__m512 udTriangle_sq_precalc_SIMD_16grid( const __m512 p_x, const __m512 p_y, const __m512 p_z, const tri_precalc_t &pc )
+void udTriangle_sq_precalc_SIMD_16grid(const __m512 p_x, const __m512 p_y, const __m512 p_z, const tri_precalc_t& pc, __m512 &ret)
 {
 	const __m512 v1_x = _mm512_set1_ps(pc.v1.x);
 	const __m512 v1_y = _mm512_set1_ps(pc.v1.y);
@@ -166,7 +166,5 @@ __m512 udTriangle_sq_precalc_SIMD_16grid( const __m512 p_x, const __m512 p_y, co
 	sum = _mm512_add_ps( sum, sign3 );
 
 	__mmask16 cmp = _mm512_cmp_ps_mask( sum, _mm512_set1_ps(2.0f), _CMP_LT_OQ );
-	__m512 res = _mm512_mask_blend_ps( cmp, res1, res0 );
-
-	return res;
+	ret = _mm512_mask_blend_ps( cmp, res1, res0 );
 }
