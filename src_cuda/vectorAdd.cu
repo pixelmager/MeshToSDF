@@ -49,6 +49,7 @@
 //note: reference https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
 //                https://docs.nvidia.com/nsight-visual-studio-edition/cuda-debugger/
 //                https://developer.nvidia.com/blog/how-implement-performance-metrics-cuda-cc/
+//                https://cs.calvin.edu/courses/cs/374/CUDA/CUDA-Thread-Indexing-Cheatsheet.pdf
 
 typedef float float32_t;
 
@@ -316,7 +317,7 @@ float32_t udTriangle_sq( const vec3_t &v1, const vec3_t &v2, const vec3_t &v3, c
 //note: naive, map every thread to a gridcell, run through all triangles per cell
 
 __host__ __device__
-float32_t calc_gridcell( const int32_t num_indices, uint32_t const * const tri_indices, const vec3_t *positions,
+float32_t calc_gridcell( const uint64_t num_indices, uint32_t const * const tri_indices, const vec3_t *positions,
 						 int32_t x, int32_t y, int32_t z, int32_t xn, int32_t yn, int32_t zn,
 						 const vec3_t &bb_mn, const vec3_t &bb_range )
 {
@@ -344,36 +345,52 @@ float32_t calc_gridcell( const int32_t num_indices, uint32_t const * const tri_i
 }
 
 __global__
-void sdf_naive( sdf_t::sdfheader_t sdfheader, const itm_header_t itmheader, const uint32_t *tri_indices, const float32_t *mesh_positions, float32_t *out_sdf_data)
+void sdf_naive( sdf_t::sdfheader_t sdfheader, const itm_header_t itmheader, const uint32_t *tri_indices, const float32_t *mesh_positions, float32_t *out_sdf_data,
+			    const int32_t num_threads )
 {
 	vec3_t const * const positions = reinterpret_cast<vec3_t const * const>( &mesh_positions[0] );
 
-	const int32_t x = threadIdx.x;
-	const int32_t y = threadIdx.y;
-	const int32_t z = threadIdx.z;
+	const int32_t dim_x = sdfheader.dim_x;
+	const int32_t dim_y = sdfheader.dim_y;
+	const int32_t dim_z = sdfheader.dim_z;
 	
-	const int32_t xn = sdfheader.dim_x;
-	const int32_t yn = sdfheader.dim_y;
-	const int32_t zn = sdfheader.dim_z;
+	const int32_t num_cells = dim_x * dim_y * dim_z;
+	const int32_t cells_per_thread = (num_cells + num_threads -1 ) / num_threads; //note: ceil-division
 
-	const vec3_t bb_min = vec3_t( sdfheader.bb_mn_x, sdfheader.bb_mn_y, sdfheader.bb_mn_z );
-	const vec3_t bb_max = vec3_t( sdfheader.bb_mx_x, sdfheader.bb_mx_y, sdfheader.bb_mx_z );
-	const vec3_t bb_range = bb_max-bb_min;
+	const int32_t tidx = threadIdx.x + blockIdx.x * blockDim.x;
 
-	float32_t d_min = calc_gridcell( itmheader.num_indices, tri_indices, positions,
-									 x, y, z, xn, yn, zn,
-		                             bb_min, bb_range);
+	const int32_t thread_overflow = max( 0, tidx * cells_per_thread + cells_per_thread - num_cells );
+
+	const int32_t grididx_min = tidx * cells_per_thread;
+
+	
+
+	int32_t grididx_count = cells_per_thread;
+
+	for ( int i=0,n=grididx_count; i<n; ++i )
+	{
+		const int32_t grididx = grididx_min + i;
+
+		const int32_t ix =   grididx % (dim_x);
+		const int32_t iy = ( grididx / dim_x) % dim_y;
+		const int32_t iz =   grididx / (dim_x*dim_y);
+
+		const vec3_t bb_min = vec3_t( sdfheader.bb_mn_x, sdfheader.bb_mn_y, sdfheader.bb_mn_z );
+		const vec3_t bb_max = vec3_t( sdfheader.bb_mx_x, sdfheader.bb_mx_y, sdfheader.bb_mx_z );
+		const vec3_t bb_range = bb_max-bb_min;
+
+		float32_t d_min = calc_gridcell( itmheader.num_indices, tri_indices, positions,
+											ix, iy, iz, dim_x, dim_y, dim_z,
+											bb_min, bb_range);
 		
-    int idx = x + y*xn + z*xn*yn;
-	out_sdf_data[idx] = sqrtf( d_min );
+		int idx = ix + iy*dim_x + iz*dim_x * dim_y;
+		out_sdf_data[idx] = sqrtf( d_min );
+	}
 }
 
 
 void invoke_naive( const itm_t &mesh, sdf_t &sdf )
 {
-    const int numBlocks = 1;
-    dim3 threadsPerBlock( sdf.header.dim_x, sdf.header.dim_y, sdf.header.dim_z );
-
     uint32_t *d_indices = NULL;
     checkCudaErrors( cudaMalloc( &d_indices, sizeof(float32_t) * mesh.header.num_indices) );
     checkCudaErrors( cudaMemcpy(d_indices, mesh.indices, sizeof(float32_t)*mesh.header.num_indices, cudaMemcpyKind::cudaMemcpyHostToDevice ) );
@@ -386,8 +403,13 @@ void invoke_naive( const itm_t &mesh, sdf_t &sdf )
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 
+	const int32_t num_cells = sdf.header.dim_x * sdf.header.dim_y * sdf.header.dim_z;
+	const int32_t num_blocks = (num_cells + 1024 - 1 ) / 1024; //note: ceil, q = (x + y - 1) / y;
+	const int32_t threads_per_block = (num_cells + num_blocks - 1 ) / num_blocks; //note: ceil
+	const int32_t num_threads = num_blocks * threads_per_block;
+
 	cudaEventRecord(start);
-    sdf_naive<<<numBlocks, threadsPerBlock>>>(sdf.header, mesh.header, d_indices, d_positions, sdf.d_data);
+	sdf_naive<<<num_blocks, threads_per_block>>>(sdf.header, mesh.header, d_indices, d_positions, sdf.d_data, num_threads);
 	cudaEventRecord(stop);
 
 
