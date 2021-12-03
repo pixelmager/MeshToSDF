@@ -1,9 +1,10 @@
 #pragma once
 
 #include <sdf_support.h>
-#include <evaluators/precalc.h>
 
 ///////////////////////////////////////////////////////////////////////////////
+
+using namespace lpt;
 
 //note: from http://iquilezles.org/www/articles/triangledistance/triangledistance.htm
 float32_t dot2( const vec3_t &v ) { return dot(v,v); }

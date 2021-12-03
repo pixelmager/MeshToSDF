@@ -345,7 +345,7 @@ int main()
 	{
 		FILE *f;
 		fopen_s( &f, "sdf.bin", "wb" ); //TODO: write to <filename>_128x128x128_sdf.bin
-		fwrite( &sdf.header, sizeof(header_t), 1, f );
+		fwrite( &sdf.header, sizeof(sdf_t::header_t), 1, f );
 		fwrite( sdf.data, sizeof(float32_t) * sdf.header.dim_x * sdf.header.dim_y * sdf.header.dim_z, 1, f );
 		fclose( f );
 	}
